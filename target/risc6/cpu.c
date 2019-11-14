@@ -126,43 +126,43 @@ static void risc6_cpu_disas_set_info(CPUState *cpu, disassemble_info *info)
 
 static int risc6_cpu_gdb_read_register(CPUState *cs, uint8_t *mem_buf, int n)
 {
-    RISC6CPU *cpu = RISC6_CPU(cs);
-    CPUClass *cc = CPU_GET_CLASS(cs);
-    CPURISC6State *env = &cpu->env;
-
-    if (n > cc->gdb_num_core_regs) {
-        return 0;
-    }
-
-    if (n < 32) {          /* GP regs */
-        return gdb_get_reg32(mem_buf, env->regs[n]);
-    } else if (n == 32) {    /* PC */
-        return gdb_get_reg32(mem_buf, env->regs[R_PC]);
-    } else if (n < 49) {     /* Status regs */
-        return gdb_get_reg32(mem_buf, env->regs[n - 1]);
-    }
-
+//    RISC6CPU *cpu = RISC6_CPU(cs);
+//    CPUClass *cc = CPU_GET_CLASS(cs);
+//    CPURISC6State *env = &cpu->env;
+//
+//    if (n > cc->gdb_num_core_regs) {
+//        return 0;
+//    }
+//
+//    if (n < 32) {          /* GP regs */
+//        return gdb_get_reg32(mem_buf, env->regs[n]);
+//    } else if (n == 32) {    /* PC */
+//        return gdb_get_reg32(mem_buf, env->regs[R_PC]);
+//    } else if (n < 49) {     /* Status regs */
+//        return gdb_get_reg32(mem_buf, env->regs[n - 1]);
+//    }
+//
     /* Invalid regs */
     return 0;
 }
 
 static int risc6_cpu_gdb_write_register(CPUState *cs, uint8_t *mem_buf, int n)
 {
-    RISC6CPU *cpu = RISC6_CPU(cs);
-    CPUClass *cc = CPU_GET_CLASS(cs);
-    CPURISC6State *env = &cpu->env;
-
-    if (n > cc->gdb_num_core_regs) {
-        return 0;
-    }
-
-    if (n < 32) {            /* GP regs */
-        env->regs[n] = ldl_p(mem_buf);
-    } else if (n == 32) {    /* PC */
-        env->regs[R_PC] = ldl_p(mem_buf);
-    } else if (n < 49) {     /* Status regs */
-        env->regs[n - 1] = ldl_p(mem_buf);
-    }
+//    RISC6CPU *cpu = RISC6_CPU(cs);
+//    CPUClass *cc = CPU_GET_CLASS(cs);
+//    CPURISC6State *env = &cpu->env;
+//
+//    if (n > cc->gdb_num_core_regs) {
+//        return 0;
+//    }
+//
+//    if (n < 32) {            /* GP regs */
+//        env->regs[n] = ldl_p(mem_buf);
+//    } else if (n == 32) {    /* PC */
+//        env->regs[R_PC] = ldl_p(mem_buf);
+//    } else if (n < 49) {     /* Status regs */
+//        env->regs[n - 1] = ldl_p(mem_buf);
+//    }
 
     return 4;
 }

@@ -183,7 +183,7 @@ static void risc6_fpga_risc_machine_init(struct MachineClass *mc)
         exit (1);
     }
     if (vga_interface_type != VGA_NONE) {
-        if (vga_interface_type == VGA_CG6) {
+        if (vga_interface_type == VGA_CG3) {
 //            if (!(graphic_depth == 1) &&
 //                !(graphic_depth == 8)) {
 //                error_report("Unsupported depth: %d", graphic_depth);
@@ -199,7 +199,7 @@ static void risc6_fpga_risc_machine_init(struct MachineClass *mc)
 
 
             /* sbus irq 5 */
-            cg6_init( 0xFFFFF800, 0x00100000,
+            cg3_init( 0xFFFFF800, 0x00100000,
                      graphic_width, graphic_height, graphic_depth);
 
 

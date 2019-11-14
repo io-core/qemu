@@ -432,7 +432,8 @@ int print_insn_lm32             (bfd_vma, disassemble_info*);
 int print_insn_big_nios2        (bfd_vma, disassemble_info*);
 int print_insn_little_nios2     (bfd_vma, disassemble_info*);
 int print_insn_xtensa           (bfd_vma, disassemble_info*);
-int print_insn_risc6            (bfd_vma, disassemble_info*);
+int print_insn_big_risc6        (bfd_vma, disassemble_info*);
+int print_insn_little_risc6        (bfd_vma, disassemble_info*);
 int print_insn_riscv32          (bfd_vma, disassemble_info*);
 int print_insn_riscv64          (bfd_vma, disassemble_info*);
 
