@@ -1,3 +1,15 @@
+
+=================
+qemu-risc6 README
+=================
+
+This is a clone of https://github.com/qemu/qemu
+Work on the risc6 backend is being done on the risc6 branch, so after
+you clone this you will want to do the following within the repo directory:
+
+git checkout risc6
+
+
 ===========
 QEMU README
 ===========
