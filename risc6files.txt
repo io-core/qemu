@@ -2,7 +2,6 @@
 risc6files.txt				# N This list
 build-risc6.sh				# N We'll do this a lot
 test-risc6.sh 				# N Functionality check -- launch qemu with default parameters to test risc6
-test-sparc.sh				# N Sanity check -- try a different architecture to see if we broke qemu
 target/risc6/asm.py			# N An assembler
 risc-boot.asm				# N Boot firmware
 arch_init.c				# M introduce QEMU_ARCH_RISC6
