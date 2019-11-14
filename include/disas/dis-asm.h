@@ -226,6 +226,7 @@ enum bfd_architecture
 #define bfd_mach_nios2r2        2
   bfd_arch_lm32,       /* Lattice Mico32 */
 #define bfd_mach_lm32 1
+ bfd_arch_risc6,       /* RISC6 */
   bfd_arch_last
   };
 #define bfd_mach_s390_31 31
@@ -431,6 +432,7 @@ int print_insn_lm32             (bfd_vma, disassemble_info*);
 int print_insn_big_nios2        (bfd_vma, disassemble_info*);
 int print_insn_little_nios2     (bfd_vma, disassemble_info*);
 int print_insn_xtensa           (bfd_vma, disassemble_info*);
+int print_insn_risc6            (bfd_vma, disassemble_info*);
 int print_insn_riscv32          (bfd_vma, disassemble_info*);
 int print_insn_riscv64          (bfd_vma, disassemble_info*);
 
