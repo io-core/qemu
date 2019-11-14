@@ -1,0 +1,2 @@
+obj-y = boot.o cpu_pic.o
+obj-$(CONFIG_RISC6_FPGA) += fpga_devboard.o

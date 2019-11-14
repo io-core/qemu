@@ -1,0 +1,9 @@
+config RISC6_FPGA
+    bool
+    select RISC6
+    select SERIAL
+    select ALTERA_TIMER
+    imply CG6
+
+config RISC6
+    bool
