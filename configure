@@ -7714,6 +7714,8 @@ case "$target_name" in
     echo "TARGET_ABI32=y" >> $config_target_mak
     gdb_xml_files="power64-core.xml power-fpu.xml power-altivec.xml power-spe.xml power-vsx.xml"
   ;;
+  risc6)
+  ;;
   riscv32)
     TARGET_BASE_ARCH=riscv
     TARGET_ABI_DIR=riscv
@@ -7903,6 +7905,9 @@ for i in $ARCH $TARGET_BASE_ARCH ; do
   ;;
   ppc*)
     disas_config "PPC"
+  ;;
+  risc6)
+    disas_config "RISC6"
   ;;
   riscv*)
     disas_config "RISCV"
