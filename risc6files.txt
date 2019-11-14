@@ -1,0 +1,36 @@
+# Probable list of new (N) or modified (M) files we'll need to implement the risc6 architecture in qemu
+risc6files.txt				# N This list
+build-risc6.sh				# N We'll do this a lot
+test-risc6.sh 				# N Functionality check -- launch qemu with default parameters to test risc6
+test-sparc.sh				# N Sanity check -- try a different architecture to see if we broke qemu
+target/risc6/asm.py			# N An assembler
+risc-boot.asm				# N Boot firmware
+arch_init.c				# M introduce QEMU_ARCH_RISC6
+include/sysemu/arch_init.h		# M introduce QEMU_ARCH_RISC6
+configure				# M introduce cross compiler definition and disas_config
+default-configs/risc6-softmmu.mak	# N Informs QEMU of emulated systems incorporating the risc6 architecture
+disas/risc6.c				# N Disassemble risc6 instructions
+disas/Makefile.objs			# M Introduce risc6 disassembler object file
+hw/Kconfig				# M Read risc6/Kconfig
+hw/risc6/fpga_devboard.c		# N Introduce simulated RISC6 fpga development board
+hw/risc6/Kconfig			# N Kconfig for the simulated RISC6 development board
+hw/risc6/Makefile.objs			# N How to build the object files
+include/disas/dis-asm.h			# M Introduce risc6 to disassembly includes
+MAINTAINERS				# M Ostensibly responsible parties
+qapi/machine.json			# M Add risc6 to the list of architectures ?
+qemu-doc.texi				# M Add a TODO to the documentation
+qemu-options.hx				# M inform QEMU of risc6 command line options
+target/risc6/Makefile.objs
+target/risc6/cpu-param.h
+target/risc6/cpu.c
+target/risc6/cpu.h
+target/risc6/helper.c
+target/risc6/helper.h
+target/risc6/mmu.c
+target/risc6/mmu.h
+target/risc6/op_helper.c
+# target/risc6/risc6-semi.c
+target/risc6/translate.c
+tests/machine-none-test.c		# M Unverified
+hw/intc/risc6_iic.c			# N Need an interrupt controller
+hw/intc/Makefile.objs			# M add the object file fo risc6_iic
