@@ -1,1 +1,1 @@
-./configure '--enable-trace-backends=simple' '--enable-system' '--enable-modules' '--audio-drv-list=pa' '--enable-kvm' '--target-list=x86_64-softmmu,arm-softmmu,aarch64-softmmu,riscv32-softmmu,riscv64-softmmu,nios2-softmmu,risc6-softmmu,sparc-softmmu' '--enable-debug' 
+./configure '--enable-system' '--enable-modules' '--audio-drv-list=pa' '--enable-kvm' '--target-list=risc6-softmmu'
