@@ -45,8 +45,6 @@
 #define INSTRUCTION_UNIMPLEMENTED()   INSTRUCTION_FLG(gen_excp, EXCP_UNIMPL)
 #define INSTRUCTION_ILLEGAL()         INSTRUCTION_FLG(gen_excp, EXCP_ILLEGAL)
 
-/* Special R-Type instruction opcode */
-#define INSN_R_TYPE 0x3A
 
 /* I-Type instruction parsing */
 #define I_TYPE(instr, code)                \
@@ -153,13 +151,6 @@ static uint8_t get_acode(uint32_t code)
     return instr.a;
 }
 
-//static TCGv load_zero(DisasContext *dc)
-//{
-//    if (!dc->zero) {
-//        dc->zero = tcg_const_i32(0);
-//    }
-//    return dc->zero;
-//}
 
 static TCGv load_gpr(DisasContext *dc, uint8_t reg)
 {
@@ -213,13 +204,6 @@ static void gen_excp(DisasContext *dc, uint32_t code, uint32_t flags)
     t_gen_helper_raise_exception(dc, flags);
 }
 
-//static void gen_check_supervisor(DisasContext *dc)
-//{
-//    if (dc->tb->flags & CR_STATUS_U) {
-//        /* CPU in user mode, privileged instruction called, stop. */
-//        t_gen_helper_raise_exception(dc, EXCP_SUPERI);
-//    }
-//}
 
 /*
  * Used as a placeholder for all instructions which do not have
@@ -398,13 +382,6 @@ static void ret(DisasContext *dc, uint32_t code, uint32_t flags)
     dc->is_jmp = DISAS_JUMP;
 }
 
-/* PC <- ba */
-//static void bret(DisasContext *dc, uint32_t code, uint32_t flags)
-//{
-//    tcg_gen_mov_tl(dc->cpu_R[R_PC], dc->cpu_R[R_BA]);
-//
-//    dc->is_jmp = DISAS_JUMP;
-//}
 
 /* PC <- rA */
 static void jmp(DisasContext *dc, uint32_t code, uint32_t flags)
@@ -421,9 +398,9 @@ static void nextpc(DisasContext *dc, uint32_t code, uint32_t flags)
 {
     R_TYPE(instr, code);
 
-//    if (likely(instr.c != R_ZERO)) {
+
         tcg_gen_movi_tl(dc->cpu_R[instr.c], dc->pc + 4);
-//    }
+
 }
 
 /*
@@ -440,80 +417,15 @@ static void callr(DisasContext *dc, uint32_t code, uint32_t flags)
     dc->is_jmp = DISAS_JUMP;
 }
 
-/* rC <- ctlN */
-//static void rdctl(DisasContext *dc, uint32_t code, uint32_t flags)
-//{
-//    R_TYPE(instr, code);
-//
-//    gen_check_supervisor(dc);
-//
-//    switch (instr.imm5 + CR_BASE) {
-//    case CR_PTEADDR:
-//    case CR_TLBACC:
-//    case CR_TLBMISC:
-//    {
-//#if !defined(CONFIG_USER_ONLY)
-//        if (likely(instr.c != R_ZERO)) {
-//            tcg_gen_mov_tl(dc->cpu_R[instr.c], dc->cpu_R[instr.imm5 + CR_BASE]);
-//#ifdef DEBUG_MMU
-//            TCGv_i32 tmp = tcg_const_i32(instr.imm5 + CR_BASE);
-//            gen_helper_mmu_read_debug(dc->cpu_R[instr.c], dc->cpu_env, tmp);
-//            tcg_temp_free_i32(tmp);
-//#endif
-//        }
-//#endif
-//        break;
-//    }
-//
-//    default:
-//        if (likely(instr.c != R_ZERO)) {
-//            tcg_gen_mov_tl(dc->cpu_R[instr.c], dc->cpu_R[instr.imm5 + CR_BASE]);
-//        }
-//        break;
-//    }
-//}
-
-/* ctlN <- rA */
-//static void wrctl(DisasContext *dc, uint32_t code, uint32_t flags)
-//{
-//    R_TYPE(instr, code);
-//
-//    gen_check_supervisor(dc);
-//
-//    switch (instr.imm5 + CR_BASE) {
-//    case CR_PTEADDR:
-//    case CR_TLBACC:
-//    case CR_TLBMISC:
-//    {
-//#if !defined(CONFIG_USER_ONLY)
-//        TCGv_i32 tmp = tcg_const_i32(instr.imm5 + CR_BASE);
-//        gen_helper_mmu_write(dc->cpu_env, tmp, load_gpr(dc, instr.a));
-//        tcg_temp_free_i32(tmp);
-//#endif
-//        break;
-//    }
-//
-//    default:
-//        tcg_gen_mov_tl(dc->cpu_R[instr.imm5 + CR_BASE], load_gpr(dc, instr.a));
-//        break;
-//    }
-//
-//    /* If interrupts were enabled using WRCTL, trigger them. */
-//#if !defined(CONFIG_USER_ONLY)
-//    if ((instr.imm5 + CR_BASE) == CR_STATUS) {
-//        gen_helper_check_interrupts(dc->cpu_env);
-//    }
-//#endif
-//}
 
 /* Comparison instructions */
 static void gen_cmpxx(DisasContext *dc, uint32_t code, uint32_t flags)
 {
     R_TYPE(instr, code);
-//    if (likely(instr.c != R_ZERO)) {
+
         tcg_gen_setcond_tl(flags, dc->cpu_R[instr.c], dc->cpu_R[instr.a],
                            dc->cpu_R[instr.b]);
-//    }
+
 }
 
 /* Math/logic instructions */
@@ -573,10 +485,6 @@ static void divs(DisasContext *dc, uint32_t code, uint32_t flags)
 {
     R_TYPE(instr, (code));
 
-    /* Stores into R_ZERO are ignored */
-//    if (unlikely(instr.c == R_ZERO)) {
-//        return;
-//    }
 
     TCGv t0 = tcg_temp_new();
     TCGv t1 = tcg_temp_new();
@@ -605,10 +513,6 @@ static void divu(DisasContext *dc, uint32_t code, uint32_t flags)
 {
     R_TYPE(instr, (code));
 
-    /* Stores into R_ZERO are ignored */
-//    if (unlikely(instr.c == R_ZERO)) {
-//        return;
-//    }
 
     TCGv t0 = tcg_temp_new();
     TCGv t1 = tcg_temp_new();
@@ -670,102 +574,9 @@ static const RISC6Instruction i_type_instructions[] = {
     INSTRUCTION(nop),                                 /* nop */
 
 
-    INSTRUCTION_FLG(gen_ldx, MO_SB),                  /* ldb */
-    INSTRUCTION_FLG(gen_cmpxxsi, TCG_COND_GE),        /* cmpgei */
-    INSTRUCTION_ILLEGAL(),
-    INSTRUCTION_ILLEGAL(),
-    INSTRUCTION_FLG(gen_ldx, MO_UW),                  /* ldhu */
-
-    INSTRUCTION_FLG(gen_stx, MO_UB),                  /* stb */
-    INSTRUCTION_FLG(gen_stx, MO_UW),                  /* sth */
-    INSTRUCTION_FLG(gen_bxx, TCG_COND_GE),            /* bge */
-    INSTRUCTION_FLG(gen_ldx, MO_SW),                  /* ldh */
-    INSTRUCTION_FLG(gen_cmpxxsi, TCG_COND_LT),        /* cmplti */
-    INSTRUCTION(br),                                  /* br */
-    INSTRUCTION_NOP(),                                /* initda */
-    INSTRUCTION_FLG(gen_stx, MO_UL),                  /* stw */
-    INSTRUCTION_FLG(gen_bxx, TCG_COND_LT),            /* blt */
-    INSTRUCTION_FLG(gen_ldx, MO_UL),                  /* ldw */
-    INSTRUCTION_FLG(gen_cmpxxsi, TCG_COND_NE),        /* cmpnei */
-    INSTRUCTION_FLG(gen_bxx, TCG_COND_NE),            /* bne */
-    INSTRUCTION_FLG(gen_cmpxxsi, TCG_COND_EQ),        /* cmpeqi */
-    INSTRUCTION_ILLEGAL(),
-    INSTRUCTION_ILLEGAL(),
-    INSTRUCTION_FLG(gen_ldx, MO_UB),                  /* ldbuio */
-    INSTRUCTION_FLG(gen_stx, MO_UB),                  /* stbio */
-    INSTRUCTION_FLG(gen_bxx, TCG_COND_EQ),            /* beq */
-    INSTRUCTION_FLG(gen_ldx, MO_SB),                  /* ldbio */
-    INSTRUCTION_FLG(gen_cmpxxui, TCG_COND_GEU),       /* cmpgeui */
-    INSTRUCTION_FLG(gen_ldx, MO_UW),                  /* ldhuio */
-    INSTRUCTION(andhi),                               /* andhi */
-    INSTRUCTION_FLG(gen_stx, MO_UW),                  /* sthio */
-    INSTRUCTION_FLG(gen_bxx, TCG_COND_GEU),           /* bgeu */
-    INSTRUCTION_FLG(gen_ldx, MO_SW),                  /* ldhio */
-    INSTRUCTION_FLG(gen_cmpxxui, TCG_COND_LTU),       /* cmpltui */
-    INSTRUCTION(orhi),                                /* orhi */
-    INSTRUCTION_FLG(gen_stx, MO_SL),                  /* stwio */
-    INSTRUCTION_FLG(gen_bxx, TCG_COND_LTU),           /* bltu */
-    INSTRUCTION_FLG(gen_ldx, MO_UL),                  /* ldwio */
-    INSTRUCTION(xorhi),                               /* xorhi */
-    INSTRUCTION_FLG(gen_ldx, MO_UB),
-    INSTRUCTION(eret),                                // eret
-    INSTRUCTION(roli),                                // roli
-    INSTRUCTION(rol),                                 // rol
-    INSTRUCTION(ret),                                 // ret
-    INSTRUCTION(nor),                                 // nor
-    INSTRUCTION(mulxuu),                              // mulxuu
-    INSTRUCTION_FLG(gen_cmpxx, TCG_COND_GE),          // cmpge
-    INSTRUCTION(jmpi),                                
-    INSTRUCTION(jmp),                                 // jmp
-    INSTRUCTION(and),                                 // and
-    INSTRUCTION_FLG(gen_cmpxx, TCG_COND_LT),          // cmplt
-    INSTRUCTION(slli),                                // slli
-    INSTRUCTION(call),                                
-    INSTRUCTION_UNIMPLEMENTED(),                      // wrprs
-    INSTRUCTION(or),                                  // or
-    INSTRUCTION(mulxsu),                              // mulxsu
-    INSTRUCTION_FLG(gen_cmpxx, TCG_COND_NE),          // cmpne
-    INSTRUCTION(srli),                                // srli
-    INSTRUCTION(srl),                                 // srl
-    INSTRUCTION(nextpc),                              // nextpc
-    INSTRUCTION(callr),                               // callr
-    INSTRUCTION(xor),                                 // xor
-    INSTRUCTION(mulxss),                              // mulxss
-    INSTRUCTION_FLG(gen_cmpxx, TCG_COND_EQ),          // cmpeq
-    INSTRUCTION(divu),                                // divu
-    INSTRUCTION(divs),                                // div
-    INSTRUCTION(mul),                                 // mul
-    INSTRUCTION_FLG(gen_cmpxx, TCG_COND_GEU),         // cmpgeu
-    INSTRUCTION_FLG(gen_excp, EXCP_TRAP),             // trap
-    INSTRUCTION_FLG(gen_cmpxx, TCG_COND_LTU),         // cmpltu
-    INSTRUCTION(add),                                 // add
-    INSTRUCTION_FLG(gen_excp, EXCP_BREAK),            // break
-    INSTRUCTION(nop),                                 // nop
-    INSTRUCTION(sub),                                 // sub
-    INSTRUCTION(srai),                                // srai
-    INSTRUCTION(sra),                                 // sra
 };
 
 
-
-//static void handle_r_type_instr(DisasContext *dc, uint32_t code, uint32_t flags)
-//{
-//    uint8_t opx;
-//    const RISC6Instruction *instr;
-//
-//    opx = get_opxcode(code);
-//    if (unlikely(opx >= ARRAY_SIZE(r_type_instructions))) {
-//        goto illegal_op;
-//    }
-//
-//    instr = &r_type_instructions[opx];
-//    instr->handler(dc, code, instr->flags);
-//
-//    return;
-//
-//illegal_op:
-//    t_gen_helper_raise_exception(dc, EXCP_ILLEGAL);
-//}
 
 static void handle_instruction(DisasContext *dc, CPURISC6State *env)
 {
@@ -786,10 +597,6 @@ static void handle_instruction(DisasContext *dc, CPURISC6State *env)
       op = 20 + get_acode(code);
     }
 
-//    if (unlikely(op >= ARRAY_SIZE(i_type_instructions))) {
-//        goto illegal_op;
-//    }
-
     dc->zero = NULL;
 
     instr = &i_type_instructions[op];
@@ -801,8 +608,6 @@ static void handle_instruction(DisasContext *dc, CPURISC6State *env)
 
     return;
 
-//illegal_op:
-//    t_gen_helper_raise_exception(dc, EXCP_ILLEGAL);
 }
 
 static const char * const regnames[] = {
@@ -915,16 +720,6 @@ void gen_intermediate_code(CPUState *cs, TranslationBlock *tb, int max_insns)
     tb->size = dc->pc - tb->pc;
     tb->icount = num_insns;
 
-#ifdef DEBUG_DISAS
-    if (qemu_loglevel_mask(CPU_LOG_TB_IN_ASM)
-        && qemu_log_in_addr_range(tb->pc)) {
-        qemu_log_lock();
-        qemu_log("IN: %s\n", lookup_symbol(tb->pc));
-        log_target_disas(cs, tb->pc, dc->pc - tb->pc);
-        qemu_log("\n");
-        qemu_log_unlock();
-    }
-#endif
 }
 
 void risc6_cpu_dump_state(CPUState *cs, FILE *f, int flags)
@@ -936,22 +731,12 @@ void risc6_cpu_dump_state(CPUState *cs, FILE *f, int flags)
     if (!env) {
         return;
     }
-/*
-    qemu_fprintf(f, "IN: PC=%x %s\n",
-                 env->regs[R_PC], lookup_symbol(env->regs[R_PC]));
-*/
     for (i = 0; i < NUM_CORE_REGS; i++) {
         qemu_fprintf(f, "%9s=%8.8x ", regnames[i], env->regs[i]);
         if ((i + 1) % 4 == 0) {
             qemu_fprintf(f, "\n");
         }
     }
-//#if !defined(CONFIG_USER_ONLY)
-//    qemu_fprintf(f, " mmu write: VPN=%05X PID %02X TLBACC %08X\n",
-//                 env->mmu.pteaddr_wr & CR_PTEADDR_VPN_MASK,
-//                 (env->mmu.tlbmisc_wr & CR_TLBMISC_PID_MASK) >> 4,
-//                 env->mmu.tlbacc_wr);
-//#endif
     qemu_fprintf(f, "\n\n");
 }
 
