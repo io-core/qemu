@@ -38,6 +38,10 @@
 #define DISAS_JUMP    DISAS_TARGET_0 /* only pc was modified dynamically */
 #define DISAS_UPDATE  DISAS_TARGET_1 /* cpu state was modified dynamically */
 #define DISAS_TB_JUMP DISAS_TARGET_2 /* only pc was modified statically */
+#define DISAS_STOP    DISAS_TARGET_4 /* Target-specific value for ctx->base.is_jmp.  */
+                                     /* We want to exit back to the cpu loop for some reason. */
+                                     /* Usually this is to recognize interrupts immediately.  */
+
 
 #define INSTRUCTION_FLG(func, flags) { (func), (flags) }
 #define INSTRUCTION(func)             INSTRUCTION_FLG(func, 0)
@@ -428,6 +432,7 @@ static const RISC6Instruction i_type_instructions[] = {
 
 static void handle_instruction(DisasContext *dc, CPURISC6State *env)
 {
+
     uint32_t code;
     uint8_t op;
     uint8_t opx;
@@ -453,7 +458,7 @@ static void handle_instruction(DisasContext *dc, CPURISC6State *env)
     if (dc->zero) {
         tcg_temp_free(dc->zero);
     }
-
+  
     return;
 
 }
@@ -667,9 +672,9 @@ static void risc6_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
 {
     CPURISC6State *env = cs->env_ptr;
     DisasContext *ctx = container_of(dcbase, DisasContext, base);
-
+if (1==2){
     handle_instruction(ctx, env);
-
+}
 
 //    ctx->opcode = translator_lduw(env, ctx->base.pc_next);
 //    decode_opc(ctx);
@@ -683,20 +688,20 @@ static void risc6_tr_tb_stop(DisasContextBase *dcbase, CPUState *cs)
 
 
     switch (ctx->base.is_jmp) {
-//    case DISAS_STOP:
-//        gen_save_cpu_state(ctx, true);
-//        if (ctx->base.singlestep_enabled) {
-//            gen_helper_debug(cpu_env);
-//        } else {
-//            tcg_gen_exit_tb(NULL, 0);
-//        }
-//        break;
     case DISAS_NEXT:
     case DISAS_TOO_MANY:
 //        gen_save_cpu_state(ctx, false);
         gen_goto_tb(ctx, 0, ctx->base.pc_next);
         break;
     case DISAS_NORETURN:
+        break;
+    case DISAS_STOP:
+//        gen_save_cpu_state(ctx, true);
+//        if (ctx->base.singlestep_enabled) {
+//            gen_helper_debug(cpu_env);
+//        } else {
+//            tcg_gen_exit_tb(NULL, 0);
+//        }
         break;
     default:
         g_assert_not_reached();
