@@ -34,7 +34,13 @@
 #include "exec/translator.h"
 #include "qemu/qemu-print.h"
 
-/* is_jmp field values */
+/* is_jmp field values
+    DISAS_NEXT = 0
+    DISAS_TOO_MANY = 1
+    DISAS_NORETURN = 2
+    DISAS_TARGET_0 = 3
+    DISAS_TARGET_1 = 4, etc.  */
+
 #define DISAS_JUMP    DISAS_TARGET_0 /* only pc was modified dynamically */
 #define DISAS_UPDATE  DISAS_TARGET_1 /* cpu state was modified dynamically */
 #define DISAS_TB_JUMP DISAS_TARGET_2 /* only pc was modified statically */
@@ -463,6 +469,15 @@ static void handle_instruction(DisasContext *dc, CPURISC6State *env)
 
 }
 
+static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn){
+    DisasJumpType ret;
+
+    ret = DISAS_NEXT;
+
+
+    return ret;
+}
+
 static const char * const regnames[] = {
     "r0",         "r1",         "r2",         "r3",
     "r4",         "r5",         "r6",         "r7",
@@ -616,6 +631,18 @@ static void risc6_tr_init_disas_context(DisasContextBase *dcbase, CPUState *cs)
 {
     DisasContext *ctx = container_of(dcbase, DisasContext, base);
     CPURISC6State *env = cs->env_ptr;
+//    RISC6CPU *cpu = RISC6_CPU(cs);
+
+// DisasContext:
+//    TCGv_ptr          cpu_env;
+//    TCGv             *cpu_R;
+//    TCGv_i32          zero;
+//    int               is_jmp;
+//    target_ulong      pc;
+//    TranslationBlock *tb;
+//    int               mem_idx;
+//    bool              singlestep_enabled;
+
 
 //    int num_insns;
 
@@ -623,20 +650,22 @@ static void risc6_tr_init_disas_context(DisasContextBase *dcbase, CPUState *cs)
     ctx->cpu_env = cpu_env;
     ctx->cpu_R   = cpu_R;
     ctx->is_jmp  = DISAS_NEXT;
-//    ctx->pc      = tb->pc;
-//    ctx->tb      = tb;
+    ctx->pc      = ctx->base.tb->pc;
+    ctx->tb      = ctx->base.tb;
     ctx->mem_idx = cpu_mmu_index(env, false);
     ctx->singlestep_enabled = cs->singlestep_enabled;
 
     /* Set up instruction counts */
 //    num_insns = 0;
 //    if (max_insns > 1) {
-        int page_insns = (TARGET_PAGE_SIZE - (ctx->base.tb->pc & TARGET_PAGE_MASK)) / 4;
+//        int page_insns = (TARGET_PAGE_SIZE - (ctx->base.tb->pc & TARGET_PAGE_MASK)) / 4;
 //        if (max_insns > page_insns) {
 //            max_insns = page_insns;
 //        }
 //    }
-    ctx->base.max_insns = page_insns;
+
+
+    ctx->base.max_insns = 1; //page_insns;
 }
 
 static void risc6_tr_tb_start(DisasContextBase *dcbase, CPUState *cs)
@@ -672,13 +701,18 @@ static void risc6_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
 {
     CPURISC6State *env = cs->env_ptr;
     DisasContext *ctx = container_of(dcbase, DisasContext, base);
+    uint32_t insn = translator_ldl(env, ctx->base.pc_next);
+
+    ctx->base.pc_next += 4;
+    ctx->base.is_jmp = translate_one(ctx, insn);
+
 if (1==2){
     handle_instruction(ctx, env);
 }
 
-//    ctx->opcode = translator_lduw(env, ctx->base.pc_next);
-//    decode_opc(ctx);
-    ctx->base.pc_next += 4;
+//    free_context_temps(ctx);
+//    translator_loop_temp_check(&ctx->base);
+
 }
 
 
@@ -686,26 +720,16 @@ static void risc6_tr_tb_stop(DisasContextBase *dcbase, CPUState *cs)
 {
     DisasContext *ctx = container_of(dcbase, DisasContext, base);
 
-
     switch (ctx->base.is_jmp) {
-    case DISAS_NEXT:
     case DISAS_TOO_MANY:
-//        gen_save_cpu_state(ctx, false);
         gen_goto_tb(ctx, 0, ctx->base.pc_next);
         break;
     case DISAS_NORETURN:
         break;
-    case DISAS_STOP:
-//        gen_save_cpu_state(ctx, true);
-//        if (ctx->base.singlestep_enabled) {
-//            gen_helper_debug(cpu_env);
-//        } else {
-//            tcg_gen_exit_tb(NULL, 0);
-//        }
-        break;
     default:
         g_assert_not_reached();
     }
+
 }
 
 static void risc6_tr_disas_log(const DisasContextBase *dcbase, CPUState *cs)
