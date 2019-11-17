@@ -27,6 +27,8 @@
 
 typedef struct CPURISC6State CPURISC6State;
 
+
+
 #include "mmu.h"
 
 //#define TARGET_LONG_BITS 32
