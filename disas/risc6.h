@@ -7,6 +7,10 @@ enum {
 };
 
 enum {
+  LDR, LDB, STR, STB,
+};
+
+enum {
   BMI, BEQ, BCS, BVS,
   BLS, BLT, BLE, BR,
   BPL, BNE, BCC, BVC,

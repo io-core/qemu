@@ -27,6 +27,7 @@
 #include "tcg-op.h"
 #include "exec/exec-all.h"
 #include "disas/disas.h"
+#include "disas/risc6.h"
 #include "exec/helper-proto.h"
 #include "exec/helper-gen.h"
 #include "exec/log.h"
@@ -435,49 +436,6 @@ static const RISC6Instruction i_type_instructions[] = {
 };
 
 
-
-static void handle_instruction(DisasContext *dc, CPURISC6State *env)
-{
-
-    uint32_t code;
-    uint8_t op;
-    uint8_t opx;
-    
-    const RISC6Instruction *instr;
-
-    code = cpu_ldl_code(env, dc->pc);
-    opx = code >> 30;
-
-    if (opx < 2){
-      op = get_opcode(code);
-    }else if (opx == 2){
-      op = 16 + (get_ucode(code) << 1) + ((code >> 28) & 1) ; 
-    }else{
-      op = 20 + get_acode(code);
-    }
-
-    dc->zero = NULL;
-
-    instr = &i_type_instructions[op];
-    instr->handler(dc, code, instr->flags);
-
-    if (dc->zero) {
-        tcg_temp_free(dc->zero);
-    }
-  
-    return;
-
-}
-
-static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn){
-    DisasJumpType ret;
-
-    ret = DISAS_NEXT;
-
-
-    return ret;
-}
-
 static const char * const regnames[] = {
     "r0",         "r1",         "r2",         "r3",
     "r4",         "r5",         "r6",         "r7",
@@ -626,6 +584,184 @@ void risc6_tcg_init(void)
 
 ///-----------------------------
 
+
+
+static void handle_instruction(DisasContext *dc, CPURISC6State *env)
+{
+
+    uint32_t insn;
+    uint8_t op;
+    uint8_t opx;
+    
+    const RISC6Instruction *instr;
+
+    insn = cpu_ldl_code(env, dc->pc);
+    opx = insn >> 30;
+
+    if (opx < 2){
+      op = get_opcode(insn);
+    }else if (opx == 2){
+      op = 16 + (get_ucode(insn) << 1) + ((insn >> 28) & 1) ; 
+    }else{
+      op = 20 + get_acode(insn);
+    }
+
+    dc->zero = NULL;
+
+    instr = &i_type_instructions[op];
+    instr->handler(dc, insn, instr->flags);
+
+    if (dc->zero) {
+        tcg_temp_free(dc->zero);
+    }
+  
+    return;
+
+}
+
+static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn){
+    DisasJumpType ret;
+    uint8_t opx;
+    uint32_t ldst;
+
+
+    ret = DISAS_NEXT;
+    opx = insn >> 30;
+
+    ctx->zero = NULL;
+
+    I_TYPE(instr, insn);
+    
+    switch (opx ){
+    case 0:
+    case 1: 
+      switch (instr.op){
+      case MOV:  
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case LSL:  
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case ASR:  
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case ROR:  
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case AND:  
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case ANN:  
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case IOR:  
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case XOR:  
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case ADD:  
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case SUB:  
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case MUL:  
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case DIV:  
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case FAD:  
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case FSB:  
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case FML:  
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case FDV:  
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      }
+    case 2:
+      ldst = (instr.opu << 1) + ((insn >> 28) & 1);
+      switch(ldst){
+      case 0:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;    
+      case 1:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case 3:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case 4:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);   
+        break;
+      }
+//      op = 16 + (get_ucode(insn) << 1) + ((insn >> 28) & 1) ;
+      break;
+    default: 
+      switch (instr.a){
+      case BMI:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case BEQ:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case BCS:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case BVS:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case BLS:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case BLT:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case BLE:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case BR:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case BPL:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case BNE:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case BCC:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case BVC:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case BHI:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case BGE:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case BGT:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      case NOP:
+        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        break;
+      }
+    }
+
+    if (ctx->zero) {
+        tcg_temp_free(ctx->zero);
+    }
+
+    return ret;
+}
 
 static void risc6_tr_init_disas_context(DisasContextBase *dcbase, CPUState *cs)
 {
