@@ -688,20 +688,19 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn){
     case 2:
       ldst = (instr.opu << 1) + ((insn >> 28) & 1);
       switch(ldst){
-      case 0:
+      case LDR:
         nop(ctx, insn, i_type_instructions[instr.op].flags);
         break;    
-      case 1:
+      case LDB:
         nop(ctx, insn, i_type_instructions[instr.op].flags);
         break;
-      case 3:
+      case STR:
         nop(ctx, insn, i_type_instructions[instr.op].flags);
         break;
-      case 4:
+      case STB:
         nop(ctx, insn, i_type_instructions[instr.op].flags);   
         break;
       }
-//      op = 16 + (get_ucode(insn) << 1) + ((insn >> 28) & 1) ;
       break;
     default: 
       switch (instr.a){
@@ -727,7 +726,15 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn){
         nop(ctx, insn, i_type_instructions[instr.op].flags);
         break;
       case BR:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        if (instr.opv == 1){                   /* return address in r15 */
+          tcg_gen_movi_tl(ctx->cpu_R[R_RA], ctx->pc + 4);
+        }
+        if (instr.opu == 0) {                     /* dest in register c */
+          tcg_gen_mov_tl(ctx->cpu_R[R_PC], ctx->cpu_R[instr.c]);
+        }else{                                      /* dest pc relative */
+          gen_goto_tb(ctx, 0, ctx->pc + 4 + (instr.imm24.s << 2));
+        }
+        ctx->is_jmp = DISAS_TB_JUMP;
         break;
       case BPL:
         nop(ctx, insn, i_type_instructions[instr.op].flags);
