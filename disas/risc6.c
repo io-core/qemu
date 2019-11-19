@@ -26,60 +26,47 @@
 #include "disas/dis-asm.h"
 #include "disas/risc6.h"
 
-//enum {
-//  MOV, LSL, ASR, ROR,
-//  AND, ANN, IOR, XOR,
-//  ADD, SUB, MUL, DIV,
-//  FAD, FSB, FML, FDV,
-//};
-//
-//enum {
-//  BMI, BEQ, BCS, BVS,
-//  BLS, BLT, BLE, BR,
-//  BPL, BNE, BCC, BVC,
-//  BHI, BGE, BGT, NOP,
-//};
-
-const char * opMOV = "MOV";
-const char * opLSL = "LSL";
-const char * opASR = "ASR";
-const char * opROR = "ROR";
-const char * opAND = "AND";
-const char * opANN = "ANN";
-const char * opIOR = "IOR";
-const char * opXOR = "XOR";
-const char * opADD = "ADD";
-const char * opSUB = "SUB";
-const char * opMUL = "MUL";
-const char * opDIV = "DIV";
-const char * opFAD = "FAD";
-const char * opFSB = "FSB";
-const char * opFML = "FML";
-const char * opFDV = "FDV";
-const char * opLDR = "LDR";
-const char * opLDB = "LDB";
-const char * opSTR = "STR";
-const char * opSTB = "STB";
-const char * opBMI = "BMI";
-const char * opBEQ = "BEQ";
-const char * opBCS = "BCS";
-const char * opBVS = "BVS";
-const char * opBLS = "BLS";
-const char * opBLT = "BLT";
-const char * opBLE = "BLE";
-const char * opBR  = "BR ";
-const char * opBPL = "BPL";
-const char * opBNE = "BNE";
-const char * opBCC = "BCC";
-const char * opBVC = "BVC";
-const char * opBHI = "BHI";
-const char * opBGE = "BGE";
-const char * opBGT = "BGT";
-const char * opNOP = "NOP";
-const char * opRTI = "RTI";
-const char * opSTI = "STI";
-const char * opCLI = "CLI";
-
+/*
+char * opMOV = "MOV";
+char * opLSL = "LSL";
+char * opASR = "ASR";
+char * opROR = "ROR";
+char * opAND = "AND";
+char * opANN = "ANN";
+char * opIOR = "IOR";
+char * opXOR = "XOR";
+char * opADD = "ADD";
+char * opSUB = "SUB";
+char * opMUL = "MUL";
+char * opDIV = "DIV";
+char * opFAD = "FAD";
+char * opFSB = "FSB";
+char * opFML = "FML";
+char * opFDV = "FDV";
+char * opLDR = "LDR";
+char * opLDB = "LDB";
+char * opSTR = "STR";
+char * opSTB = "STB";
+char * opBMI = "BMI";
+char * opBEQ = "BEQ";
+char * opBCS = "BCS";
+char * opBVS = "BVS";
+char * opBLS = "BLS";
+char * opBLT = "BLT";
+char * opBLE = "BLE";
+char * opBR  = "BR ";
+char * opBPL = "BPL";
+char * opBNE = "BNE";
+char * opBCC = "BCC";
+char * opBVC = "BVC";
+char * opBHI = "BHI";
+char * opBGE = "BGE";
+char * opBGT = "BGT";
+char * opNOP = "NOP";
+char * opRTI = "RTI";
+char * opSTI = "STI";
+char * opCLI = "CLI";
+*/
 
   const uint32_t pbit = 0x80000000;
   const uint32_t qbit = 0x40000000;
@@ -150,7 +137,8 @@ risc6_disassemble (bfd_vma address, unsigned long opcode,
 {
 
   bool found;
-  const char * thisop;
+  char * thisop;
+  char opbuff[4];
   int form;
 
   form = 1;
@@ -175,11 +163,11 @@ risc6_disassemble (bfd_vma address, unsigned long opcode,
     uint32_t im =  opcode & 0x0000FFFF;
 //    uint32_t c  =  opcode & 0x0000000F;
 
-    thisop = "???";
+//    thisop = "???";
 
     switch (op) {
       case MOV: {
-	thisop = opMOV;
+//	thisop = opMOV;
         if ((opcode & ubit) == 0) { 
         }else if ((opcode & qbit) != 0){
           form = 2;
@@ -191,74 +179,78 @@ risc6_disassemble (bfd_vma address, unsigned long opcode,
         break;
       }
       case LSL: {       /*ok*/
-	thisop = opLSL;
+//	thisop = opLSL;
         break;
       }
       case ASR: {       /*ok*/
-        thisop = opASR;
+//        thisop = opASR;
         break;
       }
       case ROR: {       /*ok*/
-        thisop = opROR;
+//        thisop = opROR;
         break;
       }
       case AND: {       /*ok*/
-        thisop = opAND;
+//        thisop = opAND;
         break;
       }
       case ANN: {       /*ok*/
-        thisop = opANN;
+//        thisop = opANN;
         break;
       }
       case IOR: {       /*ok*/
-        thisop = opIOR;
+//        thisop = opIOR;
         break;
       }
       case XOR: {       /*ok*/
-        thisop = opXOR;
+//        thisop = opXOR;
         break;
       }
       case ADD: {
-        thisop = opADD;
+//        thisop = opADD;
         form = 3;
         break;
       }
       case SUB: {
-        thisop = opSUB;
+//        thisop = opSUB;
         form = 3;
         break;
       }
       case MUL: {
-        thisop = opMUL;
+//        thisop = opMUL;
         form = 3;
         break;
       }
       case DIV: {
-        thisop = opDIV;
+//        thisop = opDIV;
         form = 3;
         break;
       }
       case FAD: {
-        thisop = opFAD;
+//        thisop = opFAD;
         form = 3;
         break;
       }
       case FSB: {
-        thisop = opFSB;
+//        thisop = opFSB;
         form = 3;
         break;
       }
       case FML: {
-        thisop = opFML;
+//        thisop = opFML;
         form = 3;
         break;
       }
       case FDV: {
-        thisop = opFDV;
+//        thisop = opFDV;
         form = 3;
         break;
       }
     }
+    thisop = opbuff;
+    memcpy( thisop, &REGOPS[op*3], 3 );
+    thisop[3] = '\0';
+    
    
     (*info->fprintf_func) (info->stream, "0x%08lx ", opcode);
     (*info->fprintf_func) (info->stream, "%s ", thisop);
@@ -282,19 +274,29 @@ risc6_disassemble (bfd_vma address, unsigned long opcode,
     int32_t offs = opcode & 0x000FFFFF;
     offs = (offs ^ 0x00080000) - 0x00080000;  // sign-extend
 
+    thisop = opbuff;
+//    memcpy( thisop, &MOVOPS[op*3], 3 );
+
+
+
     if ((opcode & ubit) == 0) {
       if ((opcode & vbit) == 0) {
-        thisop = opLDR;
+//        thisop = opLDR;
+        memcpy( thisop, &MOVOPS[0], 3 );
       }else{
-        thisop = opLDB;
+//        thisop = opLDB;
+        memcpy( thisop, &MOVOPS[3], 3 );
       }
     }else{
       if ((opcode & vbit) == 0) {
-        thisop = opSTR;
+//        thisop = opSTR;
+          memcpy( thisop, &MOVOPS[6], 3 );
       }else{
-        thisop = opSTB;
+//        thisop = opSTB;
+          memcpy( thisop, &MOVOPS[9], 3 );
       }
     }
+    thisop[3] = '\0';
 
     (*info->fprintf_func) (info->stream, "0x%08lx ", opcode);
     (*info->fprintf_func) (info->stream, "%s ", thisop);
@@ -309,70 +311,73 @@ risc6_disassemble (bfd_vma address, unsigned long opcode,
     (*info->fprintf_func) (info->stream, "0x%lx ", opcode);
     switch (ccode) {
       case BMI: {
-        thisop = opBMI;
+//        thisop = opBMI;
         break;
       }
       case BEQ: {
-        thisop = opBEQ;
+//        thisop = opBEQ;
         break;
       }
       case BCS: {
-        thisop = opBCS;
+//        thisop = opBCS;
         break;
       }
       case BVS: {
-        thisop = opBVS;
+//        thisop = opBVS;
         break;
       }
       case BLS: {
-        thisop = opBLS;
+//        thisop = opBLS;
         break;
       }
       case BLT: {
-        thisop = opBLT;
+//        thisop = opBLT;
         break;
       }
       case BLE: {
-        thisop = opBLE;
+//        thisop = opBLE;
         break;
       }
       case BR: {
-        thisop = opBR;
+//        thisop = opBR;
         break;
       }
       case BPL: {
-        thisop = opBPL;
+//        thisop = opBPL;
         break;
       }
       case BNE: {
-        thisop = opBNE;
+//        thisop = opBNE;
         break;
       }
       case BCC: {
-        thisop = opBCC;
+//        thisop = opBCC;
         break;
       }
       case BVC: {
-        thisop = opBVC;
+//        thisop = opBVC;
         break;
       }
       case BHI: {
-        thisop = opBHI;
+//        thisop = opBHI;
         break;
       }
       case BGE: {
-        thisop = opBGE;
+//        thisop = opBGE;
         break;
       }
       case BGT: {
-        thisop = opBGT;
+//        thisop = opBGT;
         break;
       }
       case NOP: {
-        thisop = opNOP;
+//        thisop = opNOP;
         break;
       }
     }
+    thisop = opbuff;
+    memcpy( thisop, &BRAOPS[ccode*3], 3 );
+    thisop[3] = '\0';
 
     (*info->fprintf_func) (info->stream, "%s ", thisop);
     (*info->fprintf_func) (info->stream, "from 0x%08lu ", address);
