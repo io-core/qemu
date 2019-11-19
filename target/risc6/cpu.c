@@ -57,12 +57,8 @@ static void risc6_cpu_reset(CPUState *cs)
     memset(env->regs, 0, sizeof(uint32_t) * NUM_CORE_REGS);
     env->regs[R_PC] = 0xFFFFE000;  // cpu->reset_addr;
 
-#if defined(CONFIG_USER_ONLY)
-    /* Start in user mode with interrupts enabled. */
-    env->regs[CR_STATUS] = CR_STATUS_U | CR_STATUS_PIE;
-#else
     env->regs[CR_STATUS] = 0;
-#endif
+
 }
 
 static void risc6_cpu_initfn(Object *obj)
@@ -94,6 +90,7 @@ static void risc6_cpu_realizefn(DeviceState *dev, Error **errp)
 
     qemu_init_vcpu(cs);
     cpu_reset(cs);
+    printf("CPU Reset\n");
 
     ncc->parent_realize(dev, errp);
 }
@@ -199,10 +196,6 @@ static void risc6_cpu_class_init(ObjectClass *oc, void *data)
     cc->set_pc = risc6_cpu_set_pc;
     cc->disas_set_info = risc6_cpu_disas_set_info;
     cc->tlb_fill = risc6_cpu_tlb_fill;
-#ifndef CONFIG_USER_ONLY
-    cc->do_unaligned_access = risc6_cpu_do_unaligned_access;
-    cc->get_phys_page_debug = risc6_cpu_get_phys_page_debug;
-#endif
     cc->gdb_read_register = risc6_cpu_gdb_read_register;
     cc->gdb_write_register = risc6_cpu_gdb_write_register;
     cc->gdb_num_core_regs = 49;

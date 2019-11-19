@@ -1,6 +1,10 @@
 /*
  * RISC6 kernel loader
  *
+ * Copyright (c) 2019 Charles Perkins <charlesap@gmail.com>
+ *
+ * Adapted from the nios2 kernel loader
+ *
  * Copyright (c) 2016 Marek Vasut <marek.vasut@gmail.com>
  *
  * Based on microblaze kernel loader
@@ -43,7 +47,7 @@
 
 #include "boot.h"
 
-#define RISC6_MAGIC    0x534f494e
+#define RISC6_MAGIC    0xf0e1d2c3;
 
 static struct risc6_boot_info {
     void (*machine_cpu_reset)(RISC6CPU *);
@@ -62,8 +66,12 @@ static void main_cpu_reset(void *opaque)
 
     cpu_reset(CPU(cpu));
 
+    printf("Reset, pc=0x%08x\n",env->regs[R_PC]);
+
     env->regs[0] =  RISC6_MAGIC; 
     env->regs[R_PC] =  0xffffe000;
+    env->regs[22] = 0xffffe000;
+
 /*
     env->regs[R_ARG0] = RISC6_MAGIC;
     env->regs[R_ARG1] = 0x12345678;      //boot_info.initrd_start;

@@ -73,6 +73,7 @@
             uint32_t u;                    \
             int32_t s;                     \
         } imm24;                           \
+        uint8_t imm5;                      \
         uint8_t opx;                       \
         uint8_t opv;                       \
         uint8_t opu;                       \
@@ -84,84 +85,27 @@
         .imm16.u = extract32((code), 0, 16), \
         .imm20.s = sextract32((code), 0, 20), \
         .imm24.s = sextract32((code), 0, 24), \
-        .opx   = extract32((code), 30, 2), \
-        .opv   = extract32((code), 28, 1), \
-        .opu   = extract32((code), 29, 1), \
-        .c     = extract32((code), 0, 4),  \
-        .b     = extract32((code), 20, 4), \
-        .a     = extract32((code), 24, 4), \
-    }
-
-/* R-Type instruction parsing  */
-#define R_TYPE(instr, code)                \
-    struct {                               \
-        uint8_t op;                        \
-        uint8_t imm5;                      \
-        uint8_t opx;                       \
-        uint8_t c;                         \
-        uint8_t b;                         \
-        uint8_t a;                         \
-    } (instr) = {                          \
-        .op    = extract32((code), 16, 4), \
         .imm5  = extract32((code), 6, 5),  \
-        .opx   = extract32((code), 28, 4), \
+        .opx   = extract32((code), 30, 2), \
+        .opv   = extract32((code), 28, 1), \
+        .opu   = extract32((code), 29, 1), \
         .c     = extract32((code), 0, 4),  \
         .b     = extract32((code), 20, 4), \
         .a     = extract32((code), 24, 4), \
     }
 
-/* J-Type instruction parsing */
-#define J_TYPE(instr, code)                \
-    struct {                               \
-        uint8_t op;                        \
-        uint8_t opx;                       \
-        uint8_t opv;                       \
-        uint8_t opu;                       \
-        uint8_t c;                         \
-        uint32_t imm24;                    \
-    } (instr) = {                          \
-        .op    = extract32((code), 24, 4), \
-        .opx   = extract32((code), 30, 2), \
-        .opv   = extract32((code), 28, 1), \
-        .opu   = extract32((code), 29, 1), \
-        .c     = extract32((code), 0, 4),  \
-        .imm24 = extract32((code), 0, 24), \
-    }
 
 typedef struct DisasContext {
     DisasContextBase  base;
-    TCGv_ptr          cpu_env;
     TCGv             *cpu_R;
     TCGv_i32          zero;
-    int               is_jmp;
-    target_ulong      pc;
-    TranslationBlock *tb;
     int               mem_idx;
-    bool              singlestep_enabled;
 } DisasContext;
 
 typedef struct RISC6Instruction {
     void     (*handler)(DisasContext *dc, uint32_t code, uint32_t flags);
     uint32_t  flags;
 } RISC6Instruction;
-
-static uint8_t get_opcode(uint32_t code)
-{
-    I_TYPE(instr, code);
-    return instr.op;
-}
-
-static uint8_t get_ucode(uint32_t code)
-{
-    I_TYPE(instr, code);
-    return instr.opu;
-}
-
-static uint8_t get_acode(uint32_t code)
-{
-    I_TYPE(instr, code);
-    return instr.a;
-}
 
 
 static TCGv load_gpr(DisasContext *dc, uint8_t reg)
@@ -172,20 +116,18 @@ static TCGv load_gpr(DisasContext *dc, uint8_t reg)
 
 static bool use_goto_tb(DisasContext *dc, uint32_t dest)
 {
-    if (unlikely(dc->singlestep_enabled)) {
+    if (unlikely(dc->base.singlestep_enabled)) {
         return false;
     }
 
-
-    return (dc->tb->pc & TARGET_PAGE_MASK) == (dest & TARGET_PAGE_MASK);
-
-
-
+    return (dc->base.tb->pc & TARGET_PAGE_MASK) == (dest & TARGET_PAGE_MASK);
 }
 
+
+// keep
 static void gen_goto_tb(DisasContext *dc, int n, uint32_t dest)
 {
-    TranslationBlock *tb = dc->tb;
+    TranslationBlock *tb = dc->base.tb;
 
     if (use_goto_tb(dc, dest)) {
         tcg_gen_goto_tb(n);
@@ -198,7 +140,7 @@ static void gen_goto_tb(DisasContext *dc, int n, uint32_t dest)
 }
 
 
-
+// keep
 static void nop(DisasContext *dc, uint32_t code, uint32_t flags)
 {
     /* Nothing to do here */
@@ -278,15 +220,15 @@ static void br(DisasContext *dc, uint32_t code, uint32_t flags)
     I_TYPE(instr, code);
 
     if (instr.opv == 1){                   /* return address in r15 */
-      tcg_gen_movi_tl(dc->cpu_R[R_RA], dc->pc + 4);
+      tcg_gen_movi_tl(dc->cpu_R[R_RA], dc->base.tb->pc + 4);
     } 
 
     if (instr.opu == 0) {                     /* dest in register c */
       tcg_gen_mov_tl(dc->cpu_R[R_PC], dc->cpu_R[instr.c]);
     }else{                                      /* dest pc relative */
-      gen_goto_tb(dc, 0, dc->pc + 4 + (instr.imm24.s << 2));
+      gen_goto_tb(dc, 0, dc->base.tb->pc + 4 + (instr.imm24.s << 2));
     }
-    dc->is_jmp = DISAS_TB_JUMP;
+    dc->base.is_jmp = DISAS_TB_JUMP;
 }
 
 
@@ -322,7 +264,7 @@ gen_i_math_logic(xori,  xori, 1, instr.imm16.u)
 #define gen_r_math_logic(fname, insn, op3)                                 \
 static void (fname)(DisasContext *dc, uint32_t code, uint32_t flags)       \
 {                                                                          \
-    R_TYPE(instr, (code));                                                 \
+    I_TYPE(instr, (code));                                                 \
         tcg_gen_##insn((dc)->cpu_R[instr.c], load_gpr((dc), instr.a),      \
                        (op3));                                             \
 }
@@ -342,7 +284,7 @@ gen_r_math_logic(sub,  sub_tl,   load_gpr(dc, instr.b))
 #define gen_r_mul(fname, insn)                                         \
 static void (fname)(DisasContext *dc, uint32_t code, uint32_t flags)   \
 {                                                                      \
-    R_TYPE(instr, (code));                                             \
+    I_TYPE(instr, (code));                                             \
         TCGv t0 = tcg_temp_new();                                      \
         tcg_gen_##insn(t0, dc->cpu_R[instr.c],                         \
                        load_gpr(dc, instr.a), load_gpr(dc, instr.b)); \
@@ -354,7 +296,7 @@ static void (fname)(DisasContext *dc, uint32_t code, uint32_t flags)   \
 #define gen_r_shift_s(fname, insn)                                         \
 static void (fname)(DisasContext *dc, uint32_t code, uint32_t flags)       \
 {                                                                          \
-    R_TYPE(instr, (code));                                                 \
+    I_TYPE(instr, (code));                                                 \
         TCGv t0 = tcg_temp_new();                                          \
         tcg_gen_andi_tl(t0, load_gpr((dc), instr.b), 31);                  \
         tcg_gen_##insn((dc)->cpu_R[instr.c], load_gpr((dc), instr.a), t0); \
@@ -370,7 +312,7 @@ gen_r_shift_s(ror, rotr_tl)
 
 static void divu(DisasContext *dc, uint32_t code, uint32_t flags)
 {
-    R_TYPE(instr, (code));
+    I_TYPE(instr, (code));
 
 
     TCGv t0 = tcg_temp_new();
@@ -456,7 +398,7 @@ static void gen_exception(DisasContext *dc, uint32_t excp)
     tcg_gen_movi_tl(cpu_R[R_PC], dc->pc);
     gen_helper_raise_exception(cpu_env, tmp);
     tcg_temp_free_i32(tmp);
-    dc->is_jmp = DISAS_UPDATE;
+    dc->base.is_jmp = DISAS_UPDATE;
 
 }
 */
@@ -471,11 +413,11 @@ void old_gen_intermediate_code(CPUState *cs, TranslationBlock *tb, int max_insns
     // Initialize DC 
     dc->cpu_env = cpu_env;
     dc->cpu_R   = cpu_R;
-    dc->is_jmp  = DISAS_NEXT;
+    dc->base.is_jmp  = DISAS_NEXT;
     dc->pc      = tb->pc;
-    dc->tb      = tb;
+    dc->base.tb = tb;
     dc->mem_idx = cpu_mmu_index(env, false);
-    dc->singlestep_enabled = cs->singlestep_enabled;
+    dc->base.singlestep_enabled = cs->singlestep_enabled;
 
     // Set up instruction counts 
     num_insns = 0;
@@ -514,7 +456,7 @@ void old_gen_intermediate_code(CPUState *cs, TranslationBlock *tb, int max_insns
         // Otherwise the subsequent code could get translated several times.
         // Also stop translation when a page boundary is reached.  This
         // ensures prefetch aborts occur at the right place.  
-    } while (!dc->is_jmp &&
+    } while (!dc->base.is_jmp &&
              !tcg_op_buf_full() &&
              num_insns < max_insns);
 
@@ -523,7 +465,7 @@ void old_gen_intermediate_code(CPUState *cs, TranslationBlock *tb, int max_insns
     }
 
     // Indicate where the next block should start 
-    switch (dc->is_jmp) {
+    switch (dc->base.is_jmp) {
     case DISAS_NEXT:
         // Save the current PC back into the CPU register 
         tcg_gen_movi_tl(cpu_R[R_PC], dc->pc);
@@ -571,6 +513,8 @@ void risc6_cpu_dump_state(CPUState *cs, FILE *f, int flags)
     qemu_fprintf(f, "\n\n");
 }
 
+///------------------------------
+
 void risc6_tcg_init(void)
 {
     int i;
@@ -582,10 +526,7 @@ void risc6_tcg_init(void)
     }
 }
 
-///-----------------------------
-
-
-
+/*
 static void handle_instruction(DisasContext *dc, CPURISC6State *env)
 {
 
@@ -595,7 +536,7 @@ static void handle_instruction(DisasContext *dc, CPURISC6State *env)
     
     const RISC6Instruction *instr;
 
-    insn = cpu_ldl_code(env, dc->pc);
+    insn = cpu_ldl_code(env, dc->base.tb->pc);
     opx = insn >> 30;
 
     if (opx < 2){
@@ -618,12 +559,13 @@ static void handle_instruction(DisasContext *dc, CPURISC6State *env)
     return;
 
 }
+*/
 
 static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn){
     DisasJumpType ret;
     uint8_t opx;
     uint32_t ldst;
-
+    TCGv data;
 
     ret = DISAS_NEXT;
     opx = insn >> 30;
@@ -631,13 +573,40 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn){
     ctx->zero = NULL;
 
     I_TYPE(instr, insn);
+
+//    printf("first: 0x%08x next: 0x%08x pc: 0x%08x  \n",ctx->base.pc_first,ctx->base.pc_next,ctx->pc);
     
     switch (opx ){
     case 0:
     case 1: 
       switch (instr.op){
       case MOV:  
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        data = ctx->cpu_R[instr.a];
+        if (instr.opx == 0){                   /* register */
+         if (instr.opu == 0){
+          if (instr.opv == 0) {
+             tcg_gen_mov_tl(ctx->cpu_R[instr.a], ctx->cpu_R[17]);
+          }else{
+             tcg_gen_mov_tl(ctx->cpu_R[instr.a], ctx->cpu_R[16]);
+          }
+         }else{
+             tcg_gen_mov_tl(ctx->cpu_R[instr.a], ctx->cpu_R[instr.c]);
+         }
+        }else{                                /* immediate */
+         if (instr.opu == 0){
+          if (instr.opv == 0) {
+            tcg_gen_andi_tl(data, load_gpr(ctx, instr.a), 0x00000000);
+          }else{
+            tcg_gen_andi_tl(data, load_gpr(ctx, instr.a), 0x00000000);
+            tcg_gen_ori_tl(data, load_gpr(ctx, instr.a), 0xFFFF0000);
+          }
+          tcg_gen_addi_tl(data, load_gpr(ctx, instr.a), instr.imm16.u);
+         }else{
+          tcg_gen_andi_tl(data, load_gpr(ctx, instr.a), 0x0000FFFF);
+          tcg_gen_addi_tl(data, load_gpr(ctx, instr.a), instr.imm16.u << 16);
+         }
+         // and also test for zero and negative
+        }
         break;
       case LSL:  
         nop(ctx, insn, i_type_instructions[instr.op].flags);
@@ -727,14 +696,15 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn){
         break;
       case BR:
         if (instr.opv == 1){                   /* return address in r15 */
-          tcg_gen_movi_tl(ctx->cpu_R[R_RA], ctx->pc + 4);
+          tcg_gen_movi_tl(ctx->cpu_R[R_RA], ctx->base.tb->pc + 4);
         }
         if (instr.opu == 0) {                     /* dest in register c */
           tcg_gen_mov_tl(ctx->cpu_R[R_PC], ctx->cpu_R[instr.c]);
         }else{                                      /* dest pc relative */
-          gen_goto_tb(ctx, 0, ctx->pc + 4 + (instr.imm24.s << 2));
+          gen_goto_tb(ctx, 0, ctx->base.tb->pc + 4 + (instr.imm24.s << 2));
         }
-        ctx->is_jmp = DISAS_TB_JUMP;
+        ret = DISAS_TB_JUMP;
+//        ctx.base->base.is_jmp = DISAS_TB_JUMP;
         break;
       case BPL:
         nop(ctx, insn, i_type_instructions[instr.op].flags);
@@ -776,27 +746,28 @@ static void risc6_tr_init_disas_context(DisasContextBase *dcbase, CPUState *cs)
     CPURISC6State *env = cs->env_ptr;
 //    RISC6CPU *cpu = RISC6_CPU(cs);
 
+// DisasContextBase:
+//    TranslationBlock *tb;
+//    target_ulong pc_first;
+//    target_ulong pc_next;
+//    DisasJumpType is_jmp;
+//    int num_insns;
+//    int max_insns;
+//    bool singlestep_enabled;
 // DisasContext:
-//    TCGv_ptr          cpu_env;
+//    DisasContextBase  base
 //    TCGv             *cpu_R;
 //    TCGv_i32          zero;
-//    int               is_jmp;
 //    target_ulong      pc;
-//    TranslationBlock *tb;
 //    int               mem_idx;
-//    bool              singlestep_enabled;
-
 
 //    int num_insns;
 
     /* Initialize DC */
-    ctx->cpu_env = cpu_env;
     ctx->cpu_R   = cpu_R;
-    ctx->is_jmp  = DISAS_NEXT;
-    ctx->pc      = ctx->base.tb->pc;
-    ctx->tb      = ctx->base.tb;
+//    ctx->pc      = ctx->base.pc_first;
     ctx->mem_idx = cpu_mmu_index(env, false);
-    ctx->singlestep_enabled = cs->singlestep_enabled;
+    ctx->base.singlestep_enabled = cs->singlestep_enabled;
 
     /* Set up instruction counts */
 //    num_insns = 0;
@@ -849,12 +820,7 @@ static void risc6_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
     ctx->base.pc_next += 4;
     ctx->base.is_jmp = translate_one(ctx, insn);
 
-if (1==2){
-    handle_instruction(ctx, env);
-}
-
-//    free_context_temps(ctx);
-//    translator_loop_temp_check(&ctx->base);
+    translator_loop_temp_check(&ctx->base);
 
 }
 
@@ -870,6 +836,7 @@ static void risc6_tr_tb_stop(DisasContextBase *dcbase, CPUState *cs)
     case DISAS_NORETURN:
         break;
     default:
+        printf("stop code: %d\n",ctx->base.is_jmp);
         g_assert_not_reached();
     }
 
@@ -896,7 +863,6 @@ void gen_intermediate_code(CPUState *cs, TranslationBlock *tb, int max_insns)
     DisasContext ctx;
     translator_loop(&risc6_tr_ops, &ctx.base, cs, tb, max_insns);
 }
-
 
 void restore_state_to_opc(CPURISC6State *env, TranslationBlock *tb, target_ulong *data)
 {
