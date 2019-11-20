@@ -561,11 +561,15 @@ static void handle_instruction(DisasContext *dc, CPURISC6State *env)
 }
 */
 
-static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn){
+static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *cs){
     DisasJumpType ret;
     uint8_t opx;
     uint32_t ldst;
     TCGv data;
+    char * thisop;
+    char opbuff[4];
+
+    thisop = opbuff;
 
     ret = DISAS_NEXT;
     opx = insn >> 30;
@@ -574,7 +578,6 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn){
 
     I_TYPE(instr, insn);
 
-//    printf("first: 0x%08x next: 0x%08x pc: 0x%08x  \n",ctx->base.pc_first,ctx->base.pc_next,ctx->pc);
     
     switch (opx ){
     case 0:
@@ -654,6 +657,8 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn){
         nop(ctx, insn, i_type_instructions[instr.op].flags);
         break;
       }
+      memcpy( thisop, &REGOPS[3*instr.op], 3 );
+      thisop[3] = '\0';
     case 2:
       ldst = (instr.opu << 1) + ((insn >> 28) & 1);
       switch(ldst){
@@ -671,6 +676,8 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn){
         break;
       }
       break;
+      memcpy( thisop, &MOVOPS[3*ldst], 3 );
+      thisop[3] = '\0';
     default: 
       switch (instr.a){
       case BMI:
@@ -731,7 +738,12 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn){
         nop(ctx, insn, i_type_instructions[instr.op].flags);
         break;
       }
+      memcpy( thisop, &BRAOPS[3*instr.a], 3 );
+      thisop[3] = '\0';
     }
+
+    printf("first: 0x%08x instr: 0x%08x %s \n",ctx->base.pc_first,insn,thisop);
+
 
     if (ctx->zero) {
         tcg_temp_free(ctx->zero);
@@ -818,7 +830,7 @@ static void risc6_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
     uint32_t insn = translator_ldl(env, ctx->base.pc_next);
 
     ctx->base.pc_next += 4;
-    ctx->base.is_jmp = translate_one(ctx, insn);
+    ctx->base.is_jmp = translate_one(ctx, insn, cs);
 
     translator_loop_temp_check(&ctx->base);
 
@@ -834,6 +846,8 @@ static void risc6_tr_tb_stop(DisasContextBase *dcbase, CPUState *cs)
         gen_goto_tb(ctx, 0, ctx->base.pc_next);
         break;
     case DISAS_NORETURN:
+        break;
+    case DISAS_TB_JUMP:
         break;
     default:
         printf("stop code: %d\n",ctx->base.is_jmp);

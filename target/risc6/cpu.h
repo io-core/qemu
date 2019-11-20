@@ -66,8 +66,8 @@ typedef struct RISC6CPUClass {
 
 /* was GP regs + CR regs + PC */
 
-/* r0-15, N, Z, C, V, H, SPC, PC */
-#define NUM_CORE_REGS (16+7) 
+/* r0-15, flags, H, SPC, PC */
+#define NUM_CORE_REGS (16+4) 
 /* was (32 + 32 + 1) */
 
 /* General purpose register aliases */
@@ -156,7 +156,7 @@ typedef struct RISC6CPUClass {
 
 /* Other registers */
 
-#define R_PC         22
+#define R_PC         19
 
 /* Exceptions */
 
