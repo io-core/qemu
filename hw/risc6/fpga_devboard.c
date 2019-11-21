@@ -127,19 +127,19 @@ static void risc6_fpga_risc_init(MachineState *machine)
 //    serial_mm_init(address_space_mem, 0xf8001600, 2, irq[1], 115200,
 //                   serial_hd(0), DEVICE_NATIVE_ENDIAN);
 
-    /* Register: Timer sys_clk_timer  */
-    dev = qdev_create(NULL, "RISC6.timer");
+    /* Register: fpga io  */
+    dev = qdev_create(NULL, "RISC6,io");
     qdev_prop_set_uint32(dev, "clock-frequency", 75 * 1000000);
     qdev_init_nofail(dev);
-    sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, 0xf8001440);
+    sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, 0xFFFFFFC0);
     sysbus_connect_irq(SYS_BUS_DEVICE(dev), 0, irq[0]);
 
-    /* Register: Timer sys_clk_timer_1  */
-    dev = qdev_create(NULL, "RISC6.timer");
-    qdev_prop_set_uint32(dev, "clock-frequency", 75 * 1000000);
-    qdev_init_nofail(dev);
-    sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, 0xe0000880);
-    sysbus_connect_irq(SYS_BUS_DEVICE(dev), 0, irq[5]);
+//    /* Register: Timer sys_clk_timer_1  */
+//    dev = qdev_create(NULL, "RISC6,timer");
+//    qdev_prop_set_uint32(dev, "clock-frequency", 75 * 1000000);
+//    qdev_init_nofail(dev);
+//    sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, 0xe0000880);
+//    sysbus_connect_irq(SYS_BUS_DEVICE(dev), 0, irq[5]);
 
     cg3_init( 0xEFFFF800, 0x00100000, graphic_width, graphic_height, graphic_depth);
 

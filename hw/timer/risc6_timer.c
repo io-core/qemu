@@ -49,7 +49,7 @@
 #define CONTROL_START 0x0004
 #define CONTROL_STOP  0x0008
 
-#define TYPE_RISC6_TIMER "RISC6,timer"
+#define TYPE_RISC6_TIMER "RISC6,io"
 #define RISC6_TIMER(obj) \
     OBJECT_CHECK(RISC6Timer, (obj), TYPE_RISC6_TIMER)
 
