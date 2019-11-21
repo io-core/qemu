@@ -28,11 +28,9 @@
 
 #include "qemu/osdep.h"
 #include "qapi/error.h"
-//#include "qemu-common.h"
 #include "cpu.h"
 #include "qemu/error-report.h"
 #include "hw/sysbus.h"
-//#include "hw/hw.h"
 #include "hw/char/serial.h"
 #include "sysemu/sysemu.h"
 #include "hw/boards.h"
@@ -40,35 +38,17 @@
 #include "exec/address-spaces.h"
 #include "qemu/config-file.h"
 #include "hw/qdev-properties.h"
-//#include "hw/display/ramfb-standalone.h"
 
 #include "boot.h"
 
 #define ROM_FILE    "risc-boot.bin"
 
-#define BINARY_DEVICE_TREE_FILE    "fpga-risc6.dtb"
-
-static void cg3_init(hwaddr addr, int vram_size, int width,
-                     int height, int depth)
+static void cg3_init(hwaddr addr, int vram_size, int width, int height, int depth)
 {
     DeviceState *dev;
     SysBusDevice *s;
 
-
-//    if (object_class_by_name("cgsix") == NULL) {
-//	printf("cgsix is null");
-//        exit(0);
-//    }
-//    dev = DEVICE(object_new("cgthree"));
-//    if (!dev) {
-//        printf("device from cgsix is null");
-//        exit(0);
-//    }
-
-
     dev = qdev_create(NULL, "cgthree");
-
-
 
     qdev_prop_set_uint32(dev, "vram-size", vram_size);
     qdev_prop_set_uint16(dev, "width", width);
@@ -105,8 +85,8 @@ static void risc6_fpga_risc_init(MachineState *machine)
     ram_addr_t rom_size = 0x2000;    
     ram_addr_t ram_base = 0x00000000;
     ram_addr_t ram_size = 0x04000000;
-//    qemu_irq *cpu_irq, irq[32];
-//    int i;
+    qemu_irq *cpu_irq, irq[32];
+    int i;
 
 
     /* Physical ROM */
@@ -131,17 +111,17 @@ static void risc6_fpga_risc_init(MachineState *machine)
     cpu = RISC6_CPU(x);
 
     /* Register: CPU interrupt controller (PIC) */
-//    cpu_irq = risc6_cpu_pic_init(cpu);
+    cpu_irq = risc6_cpu_pic_init(cpu);
 
-//    /* Register: Internal Interrupt Controller (IIC) */
-//    dev = qdev_create(NULL, "risc6,iic");
-//    object_property_add_const_link(OBJECT(dev), "cpu", OBJECT(cpu),
-//                                   &error_abort);
-//    qdev_init_nofail(dev);
-//    sysbus_connect_irq(SYS_BUS_DEVICE(dev), 0, cpu_irq[0]);
-//    for (i = 0; i < 32; i++) {
-//        irq[i] = qdev_get_gpio_in(dev, i);
-//    }
+    /* Register: Internal Interrupt Controller (IIC) */
+    dev = qdev_create(NULL, "risc6,iic");
+    object_property_add_const_link(OBJECT(dev), "cpu", OBJECT(cpu),
+                                   &error_abort);
+    qdev_init_nofail(dev);
+    sysbus_connect_irq(SYS_BUS_DEVICE(dev), 0, cpu_irq[0]);
+    for (i = 0; i < 32; i++) {
+        irq[i] = qdev_get_gpio_in(dev, i);
+    }
 
     /* Register: Altera 16550 UART */
 //    serial_mm_init(address_space_mem, 0xf8001600, 2, irq[1], 115200,
@@ -152,14 +132,14 @@ static void risc6_fpga_risc_init(MachineState *machine)
     qdev_prop_set_uint32(dev, "clock-frequency", 75 * 1000000);
     qdev_init_nofail(dev);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, 0xf8001440);
-//    sysbus_connect_irq(SYS_BUS_DEVICE(dev), 0, irq[0]);
+    sysbus_connect_irq(SYS_BUS_DEVICE(dev), 0, irq[0]);
 
     /* Register: Timer sys_clk_timer_1  */
     dev = qdev_create(NULL, "ALTR.timer");
     qdev_prop_set_uint32(dev, "clock-frequency", 75 * 1000000);
     qdev_init_nofail(dev);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, 0xe0000880);
-//    sysbus_connect_irq(SYS_BUS_DEVICE(dev), 0, irq[5]);
+    sysbus_connect_irq(SYS_BUS_DEVICE(dev), 0, irq[5]);
 
     cg3_init( 0xEFFFF800, 0x00100000, graphic_width, graphic_height, graphic_depth);
 
@@ -168,7 +148,7 @@ static void risc6_fpga_risc_init(MachineState *machine)
     cpu->exception_addr = 0xFFFFE000;
     cpu->fast_tlb_miss_addr = 0xFFFFE000;
 
-    risc6_load_kernel(cpu, ram_base, rom_base, ram_size, machine->initrd_filename,
+    risc6_board_reset(cpu, ram_base, rom_base, ram_size, machine->initrd_filename,
                       ROM_FILE, NULL);
 }
 

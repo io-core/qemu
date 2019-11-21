@@ -61,7 +61,7 @@ static struct risc6_boot_info {
 static void main_cpu_reset(void *opaque)
 {
     RISC6CPU *cpu = opaque;
-    CPUState *cs = CPU(cpu);
+//    CPUState *cs = CPU(cpu);
     CPURISC6State *env = &cpu->env;
 
     cpu_reset(CPU(cpu));
@@ -70,64 +70,27 @@ static void main_cpu_reset(void *opaque)
 
     env->regs[0] =  RISC6_MAGIC; 
     env->regs[R_PC] =  0xffffe000;
-    env->regs[22] = 0xffffe000;
 
-/*
-    env->regs[R_ARG0] = RISC6_MAGIC;
-    env->regs[R_ARG1] = 0x12345678;      //boot_info.initrd_start;
-    env->regs[R_ARG2] = 0x23456789;      //boot_info.fdt;
-    env->regs[R_ARG3] = 0x3456789a;      //boot_info.cmdline;
-*/
-    cpu_set_pc(cs, boot_info.bootstrap_pc);
-    if (boot_info.machine_cpu_reset) {
-        boot_info.machine_cpu_reset(cpu);
-    }
+    env->regs[1] = 0x12345678;      //boot_info.initrd_start;
+    env->regs[2] = 0x23456789;      //boot_info.fdt;
+    env->regs[3] = 0x3456789a;      //boot_info.cmdline;
+
+//    cpu_set_pc(cs, boot_info.bootstrap_pc);
+//    if (boot_info.machine_cpu_reset) {
+//        boot_info.machine_cpu_reset(cpu);
+//    }
 }
 
 
-void risc6_load_kernel(RISC6CPU *cpu, hwaddr ddr_base, hwaddr rom_base,
+void risc6_board_reset(RISC6CPU *cpu, hwaddr ddr_base, hwaddr rom_base,
                             uint32_t ramsize,
                             const char *initrd_filename,
                             const char *dtb_filename,
                             void (*machine_cpu_reset)(RISC6CPU *))
 {
-//    QemuOpts *machine_opts;
-//    const char *kernel_filename;
-    
-   
-//    char *filename = NULL;
-
-//    machine_opts = qemu_get_machine_opts();
-//    kernel_filename = qemu_opt_get(machine_opts, "kernel");
     
     boot_info.machine_cpu_reset = machine_cpu_reset;
     qemu_register_reset(main_cpu_reset, cpu);
 
-//    if (kernel_filename) {
-//        int kernel_size;
-        
-        
-
-        
-
-
-
-
-//            kernel_size = load_image_targphys(kernel_filename, ddr_base,
-//                                              ram_size);
-            
-            
-
-//        if (kernel_size == kernel_size) {
-
-//          boot_info.bootstrap_pc = ddr_base;
-        
-         
-
-//        }
-
-        
-        
-//    }
-//    g_free(filename);
 }
+
