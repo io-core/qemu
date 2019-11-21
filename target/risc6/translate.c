@@ -626,6 +626,7 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *c
       }
       memcpy( thisop, &REGOPS[3*instr.op], 3 );
       thisop[3] = '\0';
+      break;
     case 2:
       addr = tcg_temp_new();
       ldst = (instr.opu << 1) + ((insn >> 28) & 1);
@@ -716,7 +717,7 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *c
       thisop[3] = '\0';
     }
 
-    printf("first: 0x%08x instr: 0x%08x %s \n",ctx->base.pc_first,insn,thisop);
+    printf("first: 0x%08x instr: 0x%08x %s %d\n",ctx->base.pc_first,insn,thisop,insn >> 30);
     ctx->base.num_insns=ctx->base.num_insns+1;
     if (ctx->base.num_insns >= ctx->base.max_insns ){
         ret = DISAS_TOO_MANY;

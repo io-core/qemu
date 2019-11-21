@@ -33,12 +33,12 @@
 #include "hw/ptimer.h"
 #include "hw/qdev-properties.h"
 
-#define R_STATUS      0
-#define R_CONTROL     1
-#define R_PERIODL     2
-#define R_PERIODH     3
-#define R_SNAPL       4
-#define R_SNAPH       5
+#define R_STATUS      9
+#define R_CONTROL     10
+#define R_PERIODL     11
+#define R_PERIODH     12
+#define R_SNAPL       13
+#define R_SNAPH       14
 
 // FFFFFFC0		Millisecond Counter
 // FFFFFFC4             Switches / LED
@@ -53,7 +53,16 @@
 // FFFFFFE8             Clipboard A
 // FFFFFFEC             Clipboard B
 
-#define R_MAX         6
+#define R_MILLISECONDS	0
+#define R_LED		1
+#define R_RS232DATA	2
+#define R_RS232STATUS	3
+#define R_SPIDATA	4
+#define R_SPICONTROL	5
+#define R_MOUSE		6
+#define R_KEYBOARD	7
+
+#define R_MAX         15
 
 #define STATUS_TO     0x0001
 #define STATUS_RUN    0x0002
@@ -91,10 +100,15 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
 
     addr >>= 2;
 
+//    printf("RISC6 IO READ OF: %ld\n",addr);
+
     switch (addr) {
     case R_CONTROL:
         r = t->regs[R_CONTROL] & (CONTROL_ITO | CONTROL_CONT);
         break;
+    case R_SPICONTROL:
+	r = 1;
+	break;
 
     default:
         if (addr < ARRAY_SIZE(t->regs)) {

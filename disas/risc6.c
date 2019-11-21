@@ -380,7 +380,7 @@ risc6_disassemble (bfd_vma address, unsigned long opcode,
     thisop[3] = '\0';
 
     (*info->fprintf_func) (info->stream, "%s ", thisop);
-    (*info->fprintf_func) (info->stream, "from 0x%08lu ", address);
+    (*info->fprintf_func) (info->stream, "from 0x%08lx ", address);
     if ((opcode & ubit) == 0) {
       (*info->fprintf_func) (info->stream, "r%ld ", opcode & 0x0000000F);
     }else{
@@ -390,7 +390,7 @@ risc6_disassemble (bfd_vma address, unsigned long opcode,
       }else{
         destv = destv << 2;
       }
-      (*info->fprintf_func) (info->stream, "0x%08lu ", address + 4 + destv);
+      (*info->fprintf_func) (info->stream, "0x%08lx ", address + 4 + destv);
     }
     return INSNLEN;
 
