@@ -80,6 +80,7 @@ static void risc6_iic_realize(DeviceState *dev, Error **errp)
                    error_get_pretty(err));
         return;
     }
+    printf("risc6 iic realized\n");
 }
 
 static void risc6_iic_class_init(ObjectClass *klass, void *data)

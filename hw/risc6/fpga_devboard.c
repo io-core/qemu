@@ -128,14 +128,14 @@ static void risc6_fpga_risc_init(MachineState *machine)
 //                   serial_hd(0), DEVICE_NATIVE_ENDIAN);
 
     /* Register: Timer sys_clk_timer  */
-    dev = qdev_create(NULL, "ALTR.timer");
+    dev = qdev_create(NULL, "RISC6.timer");
     qdev_prop_set_uint32(dev, "clock-frequency", 75 * 1000000);
     qdev_init_nofail(dev);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, 0xf8001440);
     sysbus_connect_irq(SYS_BUS_DEVICE(dev), 0, irq[0]);
 
     /* Register: Timer sys_clk_timer_1  */
-    dev = qdev_create(NULL, "ALTR.timer");
+    dev = qdev_create(NULL, "RISC6.timer");
     qdev_prop_set_uint32(dev, "clock-frequency", 75 * 1000000);
     qdev_init_nofail(dev);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, 0xe0000880);

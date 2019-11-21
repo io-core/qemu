@@ -16,6 +16,10 @@ config HPET
 config I8254
     bool
 
+config RISC6_TIMER
+    bool
+    select PTIMER
+
 config ALTERA_TIMER
     bool
     select PTIMER

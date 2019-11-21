@@ -14,6 +14,8 @@ hw/Kconfig				# M Read risc6/Kconfig
 hw/risc6/fpga_devboard.c		# N Introduce simulated RISC6 fpga development board
 hw/risc6/Kconfig			# N Kconfig for the simulated RISC6 development board
 hw/risc6/Makefile.objs			# N How to build the object files
+hw/intc/risc6_iic.c                     # N Need an interrupt controller
+hw/intc/Makefile.objs                   # M add the object file fo risc6_iic
 include/disas/dis-asm.h			# M Introduce risc6 to disassembly includes
 MAINTAINERS				# M Ostensibly responsible parties
 qapi/machine.json			# M Add risc6 to the list of architectures ?
@@ -31,5 +33,3 @@ target/risc6/op_helper.c
 # target/risc6/risc6-semi.c
 target/risc6/translate.c
 tests/machine-none-test.c		# M Unverified
-hw/intc/risc6_iic.c			# N Need an interrupt controller
-hw/intc/Makefile.objs			# M add the object file fo risc6_iic
