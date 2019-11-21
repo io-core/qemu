@@ -1,5 +1,5 @@
 /*
- * QEMU model of the RISC6 timer.
+ * QEMU model of the RISC6 timer and io memory mapped registers.
  *
  * Copyright (c) 2019 Charles Perkins <charlesap@gmail.com>
  *
@@ -39,6 +39,20 @@
 #define R_PERIODH     3
 #define R_SNAPL       4
 #define R_SNAPH       5
+
+// FFFFFFC0		Millisecond Counter
+// FFFFFFC4             Switches / LED
+// FFFFFFC8             RS232 Data
+// FFFFFFCC             RS232 Status
+// FFFFFFD0             SPI Data / SPI Write
+// FFFFFFD4             SPI Status / SPI Control
+// FFFFFFD8             Mouse Input
+// FFFFFFDC             Keyboard Input
+// FFFFFFE0             
+// FFFFFFE4             
+// FFFFFFE8             Clipboard A
+// FFFFFFEC             Clipboard B
+
 #define R_MAX         6
 
 #define STATUS_TO     0x0001
