@@ -383,8 +383,7 @@ static const char * const regnames[] = {
     "r4",         "r5",         "r6",         "r7",
     "r8",         "r9",         "r10",        "r11",
     "r12",        "r13",        "r14",        "r15",
-    "N",          "Z",          "C",          "V",
-    "H",          "spc",        "pc"
+    "flg",        "H",          "spc",        "pc"
 };
 static TCGv cpu_R[NUM_CORE_REGS];
 
@@ -526,46 +525,14 @@ void risc6_tcg_init(void)
     }
 }
 
-/*
-static void handle_instruction(DisasContext *dc, CPURISC6State *env)
-{
-
-    uint32_t insn;
-    uint8_t op;
-    uint8_t opx;
-    
-    const RISC6Instruction *instr;
-
-    insn = cpu_ldl_code(env, dc->base.tb->pc);
-    opx = insn >> 30;
-
-    if (opx < 2){
-      op = get_opcode(insn);
-    }else if (opx == 2){
-      op = 16 + (get_ucode(insn) << 1) + ((insn >> 28) & 1) ; 
-    }else{
-      op = 20 + get_acode(insn);
-    }
-
-    dc->zero = NULL;
-
-    instr = &i_type_instructions[op];
-    instr->handler(dc, insn, instr->flags);
-
-    if (dc->zero) {
-        tcg_temp_free(dc->zero);
-    }
-  
-    return;
-
-}
-*/
 
 static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *cs){
     DisasJumpType ret;
     uint8_t opx;
     uint32_t ldst;
+    TCGv addr;
     TCGv data;
+    TCGv val;
     char * thisop;
     char opbuff[4];
 
@@ -660,24 +627,32 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *c
       memcpy( thisop, &REGOPS[3*instr.op], 3 );
       thisop[3] = '\0';
     case 2:
+      addr = tcg_temp_new();
       ldst = (instr.opu << 1) + ((insn >> 28) & 1);
       switch(ldst){
-      case LDR:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+      case LDR: 
+        data = ctx->cpu_R[instr.b];
+        tcg_gen_addi_tl(addr, load_gpr(ctx, instr.a), instr.imm16.s);
+        tcg_gen_qemu_ld_tl(data, addr, ctx->mem_idx, i_type_instructions[instr.op].flags);
         break;    
       case LDB:
         nop(ctx, insn, i_type_instructions[instr.op].flags);
         break;
       case STR:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        val = load_gpr(ctx, instr.b);
+        tcg_gen_addi_tl(addr, load_gpr(ctx, instr.a), instr.imm16.s);
+        tcg_gen_qemu_st_tl(val, addr, ctx->mem_idx, i_type_instructions[instr.op].flags);
         break;
       case STB:
         nop(ctx, insn, i_type_instructions[instr.op].flags);   
         break;
       }
-      break;
+
+      tcg_temp_free(addr);
+      
       memcpy( thisop, &MOVOPS[3*ldst], 3 );
       thisop[3] = '\0';
+      break;
     default: 
       switch (instr.a){
       case BMI:
@@ -711,7 +686,6 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *c
           gen_goto_tb(ctx, 0, ctx->base.tb->pc + 4 + (instr.imm24.s << 2));
         }
         ret = DISAS_TB_JUMP;
-//        ctx.base->base.is_jmp = DISAS_TB_JUMP;
         break;
       case BPL:
         nop(ctx, insn, i_type_instructions[instr.op].flags);
@@ -743,6 +717,10 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *c
     }
 
     printf("first: 0x%08x instr: 0x%08x %s \n",ctx->base.pc_first,insn,thisop);
+    ctx->base.num_insns=ctx->base.num_insns+1;
+    if (ctx->base.num_insns >= ctx->base.max_insns ){
+        ret = DISAS_TOO_MANY;
+    }
 
 
     if (ctx->zero) {
@@ -774,6 +752,7 @@ static void risc6_tr_init_disas_context(DisasContextBase *dcbase, CPUState *cs)
 //    int               mem_idx;
 
 //    int num_insns;
+    
 
     /* Initialize DC */
     ctx->cpu_R   = cpu_R;
@@ -782,14 +761,15 @@ static void risc6_tr_init_disas_context(DisasContextBase *dcbase, CPUState *cs)
     ctx->base.singlestep_enabled = cs->singlestep_enabled;
 
     /* Set up instruction counts */
-//    num_insns = 0;
-//    if (max_insns > 1) {
-//        int page_insns = (TARGET_PAGE_SIZE - (ctx->base.tb->pc & TARGET_PAGE_MASK)) / 4;
-//        if (max_insns > page_insns) {
-//            max_insns = page_insns;
-//        }
+    ctx->base.num_insns = 0;
+//    if (ctx->base.max_insns > 1) {
+        int page_insns = (TARGET_PAGE_SIZE - (ctx->base.tb->pc & TARGET_PAGE_MASK)) / 4;
+        if (ctx->base.max_insns > page_insns) {
+            ctx->base.max_insns = page_insns;
+        }
 //    }
 
+   
 
     ctx->base.max_insns = 1; //page_insns;
 }
