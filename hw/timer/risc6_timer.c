@@ -100,7 +100,7 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
 
     addr >>= 2;
 
-//    printf("RISC6 IO READ OF: %ld\n",addr);
+    printf("RISC6 IO READ OF: %ld\n",addr);
 
     switch (addr) {
     case R_CONTROL:

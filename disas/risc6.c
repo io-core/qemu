@@ -26,47 +26,6 @@
 #include "disas/dis-asm.h"
 #include "disas/risc6.h"
 
-/*
-char * opMOV = "MOV";
-char * opLSL = "LSL";
-char * opASR = "ASR";
-char * opROR = "ROR";
-char * opAND = "AND";
-char * opANN = "ANN";
-char * opIOR = "IOR";
-char * opXOR = "XOR";
-char * opADD = "ADD";
-char * opSUB = "SUB";
-char * opMUL = "MUL";
-char * opDIV = "DIV";
-char * opFAD = "FAD";
-char * opFSB = "FSB";
-char * opFML = "FML";
-char * opFDV = "FDV";
-char * opLDR = "LDR";
-char * opLDB = "LDB";
-char * opSTR = "STR";
-char * opSTB = "STB";
-char * opBMI = "BMI";
-char * opBEQ = "BEQ";
-char * opBCS = "BCS";
-char * opBVS = "BVS";
-char * opBLS = "BLS";
-char * opBLT = "BLT";
-char * opBLE = "BLE";
-char * opBR  = "BR ";
-char * opBPL = "BPL";
-char * opBNE = "BNE";
-char * opBCC = "BCC";
-char * opBVC = "BVC";
-char * opBHI = "BHI";
-char * opBGE = "BGE";
-char * opBGT = "BGT";
-char * opNOP = "NOP";
-char * opRTI = "RTI";
-char * opSTI = "STI";
-char * opCLI = "CLI";
-*/
 
   const uint32_t pbit = 0x80000000;
   const uint32_t qbit = 0x40000000;
@@ -138,9 +97,11 @@ risc6_disassemble (bfd_vma address, unsigned long opcode,
 
   bool found;
   char * thisop;
+  const char * mu;
   char opbuff[4];
   int form;
 
+  mu = " ";
   form = 1;
   found = true;
 
@@ -163,11 +124,11 @@ risc6_disassemble (bfd_vma address, unsigned long opcode,
     uint32_t im =  opcode & 0x0000FFFF;
 //    uint32_t c  =  opcode & 0x0000000F;
 
-//    thisop = "???";
+
 
     switch (op) {
       case MOV: {
-//	thisop = opMOV;
+
         if ((opcode & ubit) == 0) { 
         }else if ((opcode & qbit) != 0){
           form = 2;
@@ -178,71 +139,23 @@ risc6_disassemble (bfd_vma address, unsigned long opcode,
 	}
         break;
       }
-      case LSL: {       /*ok*/
-//	thisop = opLSL;
+      case LSL: 
+      case ASR: 
+      case ROR: 
+      case AND: 
+      case ANN:
+      case IOR: 
+      case XOR: { 
         break;
       }
-      case ASR: {       /*ok*/
-//        thisop = opASR;
-        break;
-      }
-      case ROR: {       /*ok*/
-//        thisop = opROR;
-        break;
-      }
-      case AND: {       /*ok*/
-//        thisop = opAND;
-        break;
-      }
-      case ANN: {       /*ok*/
-//        thisop = opANN;
-        break;
-      }
-      case IOR: {       /*ok*/
-//        thisop = opIOR;
-        break;
-      }
-      case XOR: {       /*ok*/
-//        thisop = opXOR;
-        break;
-      }
-      case ADD: {
-//        thisop = opADD;
-        form = 3;
-        break;
-      }
-      case SUB: {
-//        thisop = opSUB;
-        form = 3;
-        break;
-      }
-      case MUL: {
-//        thisop = opMUL;
-        form = 3;
-        break;
-      }
-      case DIV: {
-//        thisop = opDIV;
-        form = 3;
-        break;
-      }
-      case FAD: {
-//        thisop = opFAD;
-        form = 3;
-        break;
-      }
-      case FSB: {
-//        thisop = opFSB;
-        form = 3;
-        break;
-      }
-      case FML: {
-//        thisop = opFML;
-        form = 3;
-        break;
-      }
+      case ADD: 
+      case SUB: 
+      case MUL: 
+      case DIV: 
+      case FAD: 
+      case FSB: 
+      case FML: 
       case FDV: {
-//        thisop = opFDV;
         form = 3;
         break;
       }
@@ -250,12 +163,15 @@ risc6_disassemble (bfd_vma address, unsigned long opcode,
     thisop = opbuff;
     memcpy( thisop, &REGOPS[op*3], 3 );
     thisop[3] = '\0';
-    
-   
+    if ((opcode & 0x20000000)!=0){
+      mu = "'";
+    }   
     (*info->fprintf_func) (info->stream, "0x%08lx ", opcode);
-    (*info->fprintf_func) (info->stream, "%s ", thisop);
+    (*info->fprintf_func) (info->stream, "%s%s ", thisop, mu);
     (*info->fprintf_func) (info->stream, "r%i ", rega);
-    (*info->fprintf_func) (info->stream, "r%i ", regb);
+    if (op != 0){
+      (*info->fprintf_func) (info->stream, "r%i ", regb);
+    }
     if (form==1){
       (*info->fprintf_func) (info->stream, "%lxH ", (unsigned long)im);
     }else if (form==2){
@@ -277,8 +193,10 @@ risc6_disassemble (bfd_vma address, unsigned long opcode,
     thisop = opbuff;
 //    memcpy( thisop, &MOVOPS[op*3], 3 );
 
+    int  ldst = (opcode & ubit >> 28) + ((opcode >> 28) & 1);
+        memcpy( thisop, &MOVOPS[3*ldst], 3 );
 
-
+/*
     if ((opcode & ubit) == 0) {
       if ((opcode & vbit) == 0) {
 //        thisop = opLDR;
@@ -296,6 +214,8 @@ risc6_disassemble (bfd_vma address, unsigned long opcode,
           memcpy( thisop, &MOVOPS[9], 3 );
       }
     }
+*/
+
     thisop[3] = '\0';
 
     (*info->fprintf_func) (info->stream, "0x%08lx ", opcode);
@@ -310,68 +230,22 @@ risc6_disassemble (bfd_vma address, unsigned long opcode,
     uint32_t ccode = (opcode & 0x0F000000) >> 24;
     (*info->fprintf_func) (info->stream, "0x%lx ", opcode);
     switch (ccode) {
-      case BMI: {
-//        thisop = opBMI;
-        break;
-      }
-      case BEQ: {
-//        thisop = opBEQ;
-        break;
-      }
-      case BCS: {
-//        thisop = opBCS;
-        break;
-      }
-      case BVS: {
-//        thisop = opBVS;
-        break;
-      }
-      case BLS: {
-//        thisop = opBLS;
-        break;
-      }
-      case BLT: {
-//        thisop = opBLT;
-        break;
-      }
-      case BLE: {
-//        thisop = opBLE;
-        break;
-      }
-      case BR: {
-//        thisop = opBR;
-        break;
-      }
-      case BPL: {
-//        thisop = opBPL;
-        break;
-      }
-      case BNE: {
-//        thisop = opBNE;
-        break;
-      }
-      case BCC: {
-//        thisop = opBCC;
-        break;
-      }
-      case BVC: {
-//        thisop = opBVC;
-        break;
-      }
-      case BHI: {
-//        thisop = opBHI;
-        break;
-      }
-      case BGE: {
-//        thisop = opBGE;
-        break;
-      }
-      case BGT: {
-//        thisop = opBGT;
-        break;
-      }
+      case BMI: 
+      case BEQ: 
+      case BCS: 
+      case BVS: 
+      case BLS: 
+      case BLT: 
+      case BLE: 
+      case BR: 
+      case BPL: 
+      case BNE: 
+      case BCC: 
+      case BVC: 
+      case BHI: 
+      case BGE: 
+      case BGT: 
       case NOP: {
-//        thisop = opNOP;
         break;
       }
     }
@@ -380,7 +254,7 @@ risc6_disassemble (bfd_vma address, unsigned long opcode,
     thisop[3] = '\0';
 
     (*info->fprintf_func) (info->stream, "%s ", thisop);
-    (*info->fprintf_func) (info->stream, "from 0x%08lx ", address);
+//    (*info->fprintf_func) (info->stream, "from 0x%08lx ", address);
     if ((opcode & ubit) == 0) {
       (*info->fprintf_func) (info->stream, "r%ld ", opcode & 0x0000000F);
     }else{
