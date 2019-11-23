@@ -90,7 +90,6 @@ static void risc6_cpu_realizefn(DeviceState *dev, Error **errp)
 
     qemu_init_vcpu(cs);
     cpu_reset(cs);
-    printf("CPU Reset\n");
 
     ncc->parent_realize(dev, errp);
 }
