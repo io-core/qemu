@@ -58,6 +58,7 @@
 
 
 /* I-Type instruction parsing */
+/*
 #define I_TYPE(instr, code)                \
     struct {                               \
         uint8_t op;                        \
@@ -93,7 +94,7 @@
         .b     = extract32((code), 20, 4), \
         .a     = extract32((code), 24, 4), \
     }
-
+*/
 
 typedef struct DisasContext {
     DisasContextBase  base;
@@ -626,34 +627,34 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *c
         nop(ctx, insn, i_type_instructions[instr.op].flags);
         break;
       }
-      memcpy( thisop, &REGOPS[3*instr.op], 3 );
-      if ((insn & 0x20000000)!=0) {
-        thisop[3] = '\'';
-      }else{
-        thisop[3] = ' ';
-      }
-      thisop[4] = '\0';
-      if (instr.op==0){
-        printf("first: 0x%08x instr: 0x%08x %s %s     ",ctx->base.pc_first,insn,thisop,regnames[instr.a]);
-      }else{
-        printf("first: 0x%08x instr: 0x%08x %s %s %s ",ctx->base.pc_first,insn,thisop,regnames[instr.a],regnames[instr.b]);
-      }
-      if (instr.opx == 0){
-         if ((insn & 0x20000000)==0){
-           printf("%s\n",regnames[instr.c]);
-         }else{
-         if ((insn & 0x10000000)!=0){
-           printf("H\n");
-         }else{
-           printf("flg\n");
-         }
-         }
-      }else{
-         if ((insn & 0x10000000)!=0){
-           printf("ffff");
-         }
-         printf("%xH\n",instr.imm16.u);
-      }
+//      memcpy( thisop, &REGOPS[3*instr.op], 3 );
+//      if ((insn & 0x20000000)!=0) {
+//        thisop[3] = '\'';
+//      }else{
+//        thisop[3] = ' ';
+//      }
+//      thisop[4] = '\0';
+//      if (instr.op==0){
+//        printf("first: 0x%08x instr: 0x%08x %s %s     ",ctx->base.pc_first,insn,thisop,regnames[instr.a]);
+//      }else{
+//        printf("first: 0x%08x instr: 0x%08x %s %s %s ",ctx->base.pc_first,insn,thisop,regnames[instr.a],regnames[instr.b]);
+//      }
+//      if (instr.opx == 0){
+//         if ((insn & 0x20000000)==0){
+//           printf("%s\n",regnames[instr.c]);
+//         }else{
+//         if ((insn & 0x10000000)!=0){
+//           printf("H\n");
+//         }else{
+//           printf("flg\n");
+//         }
+//         }
+//      }else{
+//         if ((insn & 0x10000000)!=0){
+//           printf("ffff");
+//         }
+//         printf("%xH\n",instr.imm16.u);
+//      }
       break;
     case 2:
       addr = tcg_temp_new();
@@ -679,10 +680,10 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *c
 
       tcg_temp_free(addr);
       
-      memcpy( thisop, &MOVOPS[3*ldst], 3 );
-      thisop[3] = ' ';
-      thisop[4] = '\0';
-      printf("first: 0x%08x instr: 0x%08x %s %s %s %d\n",ctx->base.pc_first,insn,thisop,regnames[instr.a],regnames[instr.b],instr.imm16.s);
+//      memcpy( thisop, &MOVOPS[3*ldst], 3 );
+//      thisop[3] = ' ';
+//      thisop[4] = '\0';
+//      printf("first: 0x%08x instr: 0x%08x %s %s %s %d\n",ctx->base.pc_first,insn,thisop,regnames[instr.a],regnames[instr.b],instr.imm16.s);
       break;
     default: 
       switch (instr.a){
@@ -758,22 +759,25 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *c
         ret = DISAS_TB_JUMP;
         break;
       }
-      memcpy( thisop, &BRAOPS[3*instr.a], 3 );
-      if ((insn & 10000000)!=0){
-        thisop[3] = '.';
-      }else{
-        thisop[3] = ' ';
-      }
-      thisop[4] = '\0';
+//      memcpy( thisop, &BRAOPS[3*instr.a], 3 );
+//      if ((insn & 10000000)!=0){
+//        thisop[3] = '.';
+//      }else{
+//        thisop[3] = ' ';
+//      }
+//      thisop[4] = '\0';
 
-      printf("first: 0x%08x instr: 0x%08x %s ",ctx->base.pc_first,insn,thisop);
+//      printf("first: 0x%08x instr: 0x%08x %s ",ctx->base.pc_first,insn,thisop);
 
-      if (instr.opu == 0){
-        printf("%s\n",regnames[instr.c]);
-      }else{
-        printf("0x%08x\n",ctx->base.tb->pc + 4 + (instr.imm24.s << 2));
-      }
+//      if (instr.opu == 0){
+//        printf("%s\n",regnames[instr.c]);
+//      }else{
+//        printf("0x%08x\n",ctx->base.tb->pc + 4 + (instr.imm24.s << 2));
+//      }
     }
+    char dstrbuff[128];
+    ins2str( ctx->base.tb->pc, insn, dstrbuff);
+    printf("first: 0x%08x instr: %s\n",ctx->base.pc_first,dstrbuff);
 
 
     ctx->base.num_insns=ctx->base.num_insns+1;

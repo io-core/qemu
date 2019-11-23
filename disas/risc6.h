@@ -25,11 +25,11 @@ enum {
   BPL, BNE, BCC, BVC,
   BHI, BGE, BGT, NOP,
 };
-
-static const char * REGOPS = "movlslasrrorandanniorxoraddsubmuldivfadfsbfmlfdv";
-static const char * MOVOPS = "ld ldbst sdb";
-static const char * BRAOPS = "bmibeqbcsbvsblsbltblebr bplbnebccbvcbhibgebgtnop";
-
+/*
+const char * REGOPS = "movlslasrrorandanniorxoraddsubmuldivfadfsbfmlfdv";
+const char * MOVOPS = "ld ldbst sdb";
+const char * BRAOPS = "bmibeqbcsbvsblsbltblebr bplbnebccbvcbhibgebgtnop";
+*/
 /* instruction parsing */
 #define I_TYPE(instr, code)                \
     struct {                               \
@@ -67,4 +67,5 @@ static const char * BRAOPS = "bmibeqbcsbvsblsbltblebr bplbnebccbvcbhibgebgtnop";
         .a     = extract32((code), 24, 4), \
     }
 
+void ins2str( unsigned long addr, unsigned long insn, char * dstr);
 

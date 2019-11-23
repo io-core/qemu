@@ -30,7 +30,11 @@
 
 #define INSNLEN 4
 
-static void ins2str( unsigned long addr, unsigned long insn, char * dstr){   
+static const char * REGOPS = "movlslasrrorandanniorxoraddsubmuldivfadfsbfmlfdv";
+static const char * MOVOPS = "ld ldbst sdb";
+static const char * BRAOPS = "bmibeqbcsbvsblsbltblebr bplbnebccbvcbhibgebgtnop";
+
+void ins2str( unsigned long addr, unsigned long insn, char * dstr){   
     uint8_t opx;
     uint32_t ldst;
     char * thisop;
