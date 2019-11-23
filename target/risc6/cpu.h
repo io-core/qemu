@@ -156,6 +156,13 @@ typedef struct RISC6CPUClass {
 
 /* Other registers */
 
+#define R_MT         12
+#define R_BP         13
+#define R_SP         14
+#define R_LNK        15
+#define R_FLG        16
+#define R_H          17
+#define R_SPC        18
 #define R_PC         19
 
 /* Exceptions */
