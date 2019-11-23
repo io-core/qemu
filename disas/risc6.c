@@ -26,66 +26,87 @@
 #include "disas/dis-asm.h"
 #include "disas/risc6.h"
 
-
-  const uint32_t pbit = 0x80000000;
-  const uint32_t qbit = 0x40000000;
-  const uint32_t ubit = 0x20000000;
-  const uint32_t vbit = 0x10000000;
-
-
-
-struct risc6_opcode
-{
-  const char *name;		/* The name of the instruction.  */
-  const char *args;		/* A string describing the arguments for this 
-				   instruction.  */
-  unsigned long match;		/* The basic opcode for the instruction.  */
-  unsigned long mask;		/* Mask for the opcode field of the 
-				   instruction.  */
-};
-
-#define IW_OP_LSB 0 
-#define IW_OP_SIZE 4
-
-#define IW_OP_UNSHIFTED_MASK (0xffffffffu >> (32 - IW_OP_SIZE)) 
-#define IW_OP_SHIFTED_MASK (IW_OP_UNSHIFTED_MASK << IW_OP_LSB) 
-
-#define GET_IW_OP(W) (((W) >> IW_OP_LSB) & IW_OP_UNSHIFTED_MASK) 
-#define SET_IW_OP(V) (((V) & IW_OP_UNSHIFTED_MASK) << IW_OP_LSB) 
-
- 
- 
-extern const struct risc6_opcode risc6_r_opcodes[];
-extern const int risc6_num_r_opcodes;
-extern struct risc6_opcode *risc6_opcodes;
-extern int risc6_num_opcodes;
-
-extern const struct risc6_opcode *
-risc6_find_opcode_hash (unsigned long, unsigned long);
-
-
 #endif /* _RISC6_H */
 
 #define INSNLEN 4
-typedef struct _risc6_opcode_link
-{
-  const struct risc6_opcode *opcode;
-  struct _risc6_opcode_link *next;
-} risc6_opcode_link;
 
-/* Hash table size.  */
-#define OPCODE_HASH_SIZE (IW_OP_UNSHIFTED_MASK + 1)
+static void ins2str( unsigned long addr, unsigned long insn, char * dstr){   
+    uint8_t opx;
+    uint32_t ldst;
+    char * thisop;
+    char opbuff[5];
+    int creg;
+    const char * nprfx;
 
-/* Return a pointer to an risc6_opcode struct for a given instruction
-   word OPCODE for bfd machine MACH, or NULL if there is an error.  */
+   
+    nprfx = "";
+    thisop = opbuff;
+    opx = insn >> 30;
 
-const struct risc6_opcode *
-risc6_find_opcode_hash (unsigned long opcode, unsigned long mach)
-{
+    I_TYPE(instr, insn);
 
-  return NULL;
+    switch (opx ){
+    case 0:
+    case 1:
+      memcpy( thisop, &REGOPS[3*instr.op], 3 );
+      if ((insn & 0x20000000)!=0) {
+        thisop[3] = '\'';
+      }else{
+        thisop[3] = ' ';
+      }
+      thisop[4] = '\0';
+      
+      if (instr.opx == 0){
+         if ((insn & 0x20000000)==0){
+           creg = instr.c;
+
+         }else{
+           if ((insn & 0x10000000)!=0){
+             creg = 17; //R_H
+             printf("H\n");
+           }else{
+             creg = 16; //R_FLG
+           }
+         }
+         if (instr.op==0){
+            sprintf(dstr,"%08lx %s %s %s",insn,thisop,regnames[instr.a],regnames[creg]);
+         }else{
+            sprintf(dstr,"%08lx %s %s %s %s",insn,thisop,regnames[instr.a],regnames[instr.b],regnames[creg]);
+         }
+      }else{
+         if ((insn & 0x10000000)!=0){
+           nprfx = "ffff";
+         }
+         if (instr.op==0){
+           sprintf(dstr,"%08lx %s %s %s%xH",insn,thisop,regnames[instr.a],nprfx,instr.imm16.u);
+         }else{
+           sprintf(dstr,"%08lx %s %s %s %s%xH",insn,thisop,regnames[instr.a],regnames[instr.b],nprfx,instr.imm16.u);
+         }
+      }
+      break;
+    case 2:
+      ldst = (instr.opu << 1) + ((insn >> 28) & 1);
+      memcpy( thisop, &MOVOPS[3*ldst], 3 );
+      thisop[3] = ' ';
+      thisop[4] = '\0';
+      sprintf(dstr,"%08lx %s %s %s %d",insn,thisop,regnames[instr.a],regnames[instr.b],instr.imm16.s);
+      break;
+    default:
+      memcpy( thisop, &BRAOPS[3*instr.a], 3 );
+      if ((insn & 10000000)!=0){
+        thisop[3] = '.';
+      }else{
+        thisop[3] = ' ';
+      }
+      thisop[4] = '\0';
+     
+      if (instr.opu == 0){
+        sprintf(dstr,"%08lx %s %s",insn,thisop,regnames[instr.c]);
+      }else{
+        sprintf(dstr,"%08lx %s 0x%08lx",insn,thisop,addr + 4 + (instr.imm24.s << 2));
+      }
+    }
 }
-
 
 /* risc6_disassemble does all the work of disassembling a RISC6
    instruction opcode.  */
@@ -94,194 +115,10 @@ static int
 risc6_disassemble (bfd_vma address, unsigned long opcode,
 		   disassemble_info *info)
 {
-
-  bool found;
-  char * thisop;
-  const char * mu;
-  char opbuff[4];
-  int form;
-
-  mu = " ";
-  form = 1;
-  found = true;
-
-  info->bytes_per_line = INSNLEN;
-  info->bytes_per_chunk = INSNLEN;
-  info->display_endian = info->endian;
-  info->insn_info_valid = 1;
-  info->branch_delay_insns = 0;
-  info->data_size = 0;
-  info->insn_type = dis_nonbranch;
-  info->target = 0;
-  info->target2 = 0;
-
-
-  if ((opcode & pbit) == 0) {
-    // Register instructions
-    uint32_t rega  = (opcode & 0x0F000000) >> 24;
-    uint32_t regb  = (opcode & 0x00F00000) >> 20;
-    uint32_t op = (opcode & 0x000F0000) >> 16;
-    uint32_t im =  opcode & 0x0000FFFF;
-//    uint32_t c  =  opcode & 0x0000000F;
-
-
-
-    switch (op) {
-      case MOV: {
-
-        if ((opcode & ubit) == 0) { 
-        }else if ((opcode & qbit) != 0){
-          form = 2;
-        }else if ((opcode & vbit) != 0){
-          form = 3;
-        }else {
-          form = 4;
-	}
-        break;
-      }
-      case LSL: 
-      case ASR: 
-      case ROR: 
-      case AND: 
-      case ANN:
-      case IOR: 
-      case XOR: { 
-        break;
-      }
-      case ADD: 
-      case SUB: 
-      case MUL: 
-      case DIV: 
-      case FAD: 
-      case FSB: 
-      case FML: 
-      case FDV: {
-        form = 3;
-        break;
-      }
-    }
-    thisop = opbuff;
-    memcpy( thisop, &REGOPS[op*3], 3 );
-    thisop[3] = '\0';
-    if ((opcode & 0x20000000)!=0){
-      mu = "'";
-    }   
-    (*info->fprintf_func) (info->stream, "0x%08lx ", opcode);
-    (*info->fprintf_func) (info->stream, "%s%s ", thisop, mu);
-    (*info->fprintf_func) (info->stream, "r%i ", rega);
-    if (op != 0){
-      (*info->fprintf_func) (info->stream, "r%i ", regb);
-    }
-    if (form==1){
-      (*info->fprintf_func) (info->stream, "%lxH ", (unsigned long)im);
-    }else if (form==2){
-      (*info->fprintf_func) (info->stream, "%lx0000H ", (unsigned long)im);
-    }else{
-      (*info->fprintf_func) (info->stream, "??? ");
-
-    }
-      return INSNLEN;
-
-  } else if ((opcode & qbit) == 0) {
-    // Memory instructions
-
-    uint32_t rega = (opcode & 0x0F000000) >> 24;
-    uint32_t regb = (opcode & 0x00F00000) >> 20;
-    int32_t offs = opcode & 0x000FFFFF;
-    offs = (offs ^ 0x00080000) - 0x00080000;  // sign-extend
-
-    thisop = opbuff;
-//    memcpy( thisop, &MOVOPS[op*3], 3 );
-
-    int  ldst = (opcode & ubit >> 28) + ((opcode >> 28) & 1);
-        memcpy( thisop, &MOVOPS[3*ldst], 3 );
-
-/*
-    if ((opcode & ubit) == 0) {
-      if ((opcode & vbit) == 0) {
-//        thisop = opLDR;
-        memcpy( thisop, &MOVOPS[0], 3 );
-      }else{
-//        thisop = opLDB;
-        memcpy( thisop, &MOVOPS[3], 3 );
-      }
-    }else{
-      if ((opcode & vbit) == 0) {
-//        thisop = opSTR;
-          memcpy( thisop, &MOVOPS[6], 3 );
-      }else{
-//        thisop = opSTB;
-          memcpy( thisop, &MOVOPS[9], 3 );
-      }
-    }
-*/
-
-    thisop[3] = '\0';
-
-    (*info->fprintf_func) (info->stream, "0x%08lx ", opcode);
-    (*info->fprintf_func) (info->stream, "%s ", thisop);
-    (*info->fprintf_func) (info->stream, "r%i ", rega);
-    (*info->fprintf_func) (info->stream, "r%i ", regb);
-    (*info->fprintf_func) (info->stream, "%i ", offs);
-
-     return INSNLEN;
-  } else {
-    // Branch instructions
-    uint32_t ccode = (opcode & 0x0F000000) >> 24;
-    (*info->fprintf_func) (info->stream, "0x%lx ", opcode);
-    switch (ccode) {
-      case BMI: 
-      case BEQ: 
-      case BCS: 
-      case BVS: 
-      case BLS: 
-      case BLT: 
-      case BLE: 
-      case BR: 
-      case BPL: 
-      case BNE: 
-      case BCC: 
-      case BVC: 
-      case BHI: 
-      case BGE: 
-      case BGT: 
-      case NOP: {
-        break;
-      }
-    }
-    thisop = opbuff;
-    memcpy( thisop, &BRAOPS[ccode*3], 3 );
-    thisop[3] = '\0';
-
-    (*info->fprintf_func) (info->stream, "%s ", thisop);
-//    (*info->fprintf_func) (info->stream, "from 0x%08lx ", address);
-    if ((opcode & ubit) == 0) {
-      (*info->fprintf_func) (info->stream, "r%ld ", opcode & 0x0000000F);
-    }else{
-      int32_t destv = (opcode & 0x00FFFFFF);
-      if ((destv >> 23)==1){
-        destv = (destv | 0xFF000000) << 2;
-      }else{
-        destv = destv << 2;
-      }
-      (*info->fprintf_func) (info->stream, "0x%08lx ", address + 4 + destv);
-    }
-    return INSNLEN;
-
-
-  }
-
-
-  if (found == true)
-    {
-     return INSNLEN;
-    }
-  else
-    {
-     info->insn_type = dis_noninsn;
-     (*info->fprintf_func) (info->stream, "0x%lx", opcode);
-     return INSNLEN;
-    }
+  char dstrbuff[128];
+  ins2str( address, opcode, dstrbuff);
+  (*info->fprintf_func) (info->stream, "%s",dstrbuff);
+  return INSNLEN;
 }
 
 
