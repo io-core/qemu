@@ -42,12 +42,12 @@
     DISAS_TARGET_0 = 3
     DISAS_TARGET_1 = 4, etc.  */
 
-#define DISAS_JUMP    DISAS_TARGET_0 /* only pc was modified dynamically */
-#define DISAS_UPDATE  DISAS_TARGET_1 /* cpu state was modified dynamically */
-#define DISAS_TB_JUMP DISAS_TARGET_2 /* only pc was modified statically */
-#define DISAS_STOP    DISAS_TARGET_4 /* Target-specific value for ctx->base.is_jmp.  */
-                                     /* We want to exit back to the cpu loop for some reason. */
-                                     /* Usually this is to recognize interrupts immediately.  */
+#define DISAS_JUMP    DISAS_TARGET_0 /* = 3  only pc was modified dynamically */
+#define DISAS_UPDATE  DISAS_TARGET_1 /* = 4  cpu state was modified dynamically */
+#define DISAS_TB_JUMP DISAS_TARGET_2 /* = 5  only pc was modified statically */
+#define DISAS_STOP    DISAS_TARGET_4 /* = 6  Target-specific value for ctx->base.is_jmp.  */
+                                     /*      We want to exit back to the cpu loop for some reason. */
+                                     /*      Usually this is to recognize interrupts immediately.  */
 
 
 #define INSTRUCTION_FLG(func, flags) { (func), (flags) }
@@ -57,44 +57,6 @@
 #define INSTRUCTION_ILLEGAL()         INSTRUCTION_FLG(gen_excp, EXCP_ILLEGAL)
 
 
-/* I-Type instruction parsing */
-/*
-#define I_TYPE(instr, code)                \
-    struct {                               \
-        uint8_t op;                        \
-        union {                            \
-            uint16_t u;                    \
-            int16_t s;                     \
-        } imm16;                           \
-        union {                            \
-            uint32_t u;                    \
-            int32_t s;                     \
-        } imm20;                           \
-        union {                            \
-            uint32_t u;                    \
-            int32_t s;                     \
-        } imm24;                           \
-        uint8_t imm5;                      \
-        uint8_t opx;                       \
-        uint8_t opv;                       \
-        uint8_t opu;                       \
-        uint8_t c;                         \
-        uint8_t b;                         \
-        uint8_t a;                         \
-    } (instr) = {                          \
-        .op    = extract32((code), 16, 4), \
-        .imm16.u = extract32((code), 0, 16), \
-        .imm20.s = sextract32((code), 0, 20), \
-        .imm24.s = sextract32((code), 0, 24), \
-        .imm5  = extract32((code), 6, 5),  \
-        .opx   = extract32((code), 30, 2), \
-        .opv   = extract32((code), 28, 1), \
-        .opu   = extract32((code), 29, 1), \
-        .c     = extract32((code), 0, 4),  \
-        .b     = extract32((code), 20, 4), \
-        .a     = extract32((code), 24, 4), \
-    }
-*/
 
 typedef struct DisasContext {
     DisasContextBase  base;
@@ -107,6 +69,8 @@ typedef struct RISC6Instruction {
     void     (*handler)(DisasContext *dc, uint32_t code, uint32_t flags);
     uint32_t  flags;
 } RISC6Instruction;
+
+TCGv_i32 cpu_CF, cpu_NF, cpu_VF, cpu_ZF;
 
 
 static TCGv load_gpr(DisasContext *dc, uint8_t reg)
@@ -517,6 +481,25 @@ void risc6_cpu_dump_state(CPUState *cs, FILE *f, int flags)
 
 ///------------------------------
 
+
+
+/* dest = T0 - T1. Compute C, N, V and Z flags */
+/*
+static void gen_sub_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
+{
+    TCGv_i32 tmp;
+//    tcg_gen_sub_i32(cpu_NF, t0, t1);
+//    tcg_gen_mov_i32(cpu_ZF, cpu_NF);
+//    tcg_gen_setcond_i32(TCG_COND_GEU, cpu_CF, t0, t1);
+//    tcg_gen_xor_i32(cpu_VF, cpu_NF, t0);
+    tmp = tcg_temp_new_i32();
+    tcg_gen_xor_i32(tmp, t0, t1);
+    tcg_gen_and_i32(cpu_VF, cpu_VF, tmp);
+    tcg_temp_free_i32(tmp);
+//    tcg_gen_mov_i32(dest, cpu_NF);
+}
+*/
+
 void risc6_tcg_init(void)
 {
     int i;
@@ -536,10 +519,12 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *c
     TCGv addr;
     TCGv data;
     TCGv val;
-    char * thisop;
-    char opbuff[5];
+    TCGLabel *l1;
 
-    thisop = opbuff;
+//    char * thisop;
+//    char opbuff[5];
+
+//    thisop = opbuff;
 
     ret = DISAS_NEXT;
     opx = insn >> 30;
@@ -605,8 +590,12 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *c
       case ADD:  
         nop(ctx, insn, i_type_instructions[instr.op].flags);
         break;
-      case SUB:  
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+      case SUB: 
+        tcg_gen_sub_tl((ctx)->cpu_R[instr.c], load_gpr((ctx), instr.a),load_gpr(ctx, instr.b));
+        tcg_gen_setcond_tl(i_type_instructions[instr.op].flags, ctx->cpu_R[instr.c], ctx->cpu_R[instr.a], ctx->cpu_R[instr.b]);
+        tcg_gen_setcondi_tl(i_type_instructions[instr.op].flags, (ctx)->cpu_R[instr.b], (ctx)->cpu_R[instr.a], instr.imm16.u);                   
+ 
+   //     gen_sub_CC(ctx->cpu_R[instr.a],ctx->cpu_R[instr.b],ctx->cpu_R[instr.c]);
         break;
       case MUL:  
         nop(ctx, insn, i_type_instructions[instr.op].flags);
@@ -685,80 +674,95 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *c
 //      thisop[4] = '\0';
 //      printf("first: 0x%08x instr: 0x%08x %s %s %s %d\n",ctx->base.pc_first,insn,thisop,regnames[instr.a],regnames[instr.b],instr.imm16.s);
       break;
-    default: 
+    default:
+      if (instr.opv == 1){                   /* return address in r15 */
+        tcg_gen_movi_tl(ctx->cpu_R[R_RA], ctx->base.tb->pc + 4);
+      }
+
+      l1 = gen_new_label();
+
       switch (instr.a){
       case BMI:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         ret = DISAS_TB_JUMP;
         break;
       case BEQ:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        tcg_gen_brcond_tl(TCG_COND_EQ, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         ret = DISAS_TB_JUMP;
         break;
       case BCS:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         ret = DISAS_TB_JUMP;
         break;
       case BVS:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         ret = DISAS_TB_JUMP;
         break;
       case BLS:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         ret = DISAS_TB_JUMP;
         break;
       case BLT:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         ret = DISAS_TB_JUMP;
         break;
       case BLE:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
-        ret = DISAS_TB_JUMP;
+        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         break;
-      case BR:
-        if (instr.opv == 1){                   /* return address in r15 */
-          tcg_gen_movi_tl(ctx->cpu_R[R_RA], ctx->base.tb->pc + 4);
-        }
-        if (instr.opu == 0) {                     /* dest in register c */
-          tcg_gen_mov_tl(ctx->cpu_R[R_PC], ctx->cpu_R[instr.c]);
-        }else{                                      /* dest pc relative */
-          gen_goto_tb(ctx, 0, ctx->base.tb->pc + 4 + (instr.imm24.s << 2));
-        }
+      case BR: 
+        tcg_gen_brcond_tl(TCG_COND_ALWAYS, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         ret = DISAS_TB_JUMP;
+//        if (instr.opu == 0) {                     /* dest in register c */
+//          tcg_gen_mov_tl(ctx->cpu_R[R_PC], ctx->cpu_R[instr.c]);
+//        }else{                                      /* dest pc relative */
+//          gen_goto_tb(ctx, 0, ctx->base.tb->pc + 4 + (instr.imm24.s << 2));
+//        }
+//        ret = DISAS_TB_JUMP;
         break;
       case BPL:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         ret = DISAS_TB_JUMP;
         break;
       case BNE:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        tcg_gen_brcond_tl(TCG_COND_NE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         ret = DISAS_TB_JUMP;
         break;
       case BCC:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         ret = DISAS_TB_JUMP;
         break;
       case BVC:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         ret = DISAS_TB_JUMP;
         break;
       case BHI:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         ret = DISAS_TB_JUMP;
         break;
       case BGE:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        tcg_gen_brcond_tl(TCG_COND_GE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         ret = DISAS_TB_JUMP;
         break;
       case BGT:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        tcg_gen_brcond_tl(TCG_COND_GT, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         ret = DISAS_TB_JUMP;
         break;
       case NOP:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        tcg_gen_brcond_tl(TCG_COND_NEVER, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         ret = DISAS_TB_JUMP;
         break;
       }
+
+      gen_goto_tb(ctx, 0, ctx->base.tb->pc + 4);
+      gen_set_label(l1);
+      if (instr.opu == 0) {                     /* dest in register c */
+        tcg_gen_mov_tl(ctx->cpu_R[R_PC], ctx->cpu_R[instr.c]);
+      }else{                                      /* dest pc relative */
+        gen_goto_tb(ctx, 1, ctx->base.tb->pc + 4 + (instr.imm24.s <<2 ));
+      }
+      ret = DISAS_TB_JUMP;
+
+
 //      memcpy( thisop, &BRAOPS[3*instr.a], 3 );
 //      if ((insn & 10000000)!=0){
 //        thisop[3] = '.';
