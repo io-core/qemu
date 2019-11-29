@@ -66,33 +66,28 @@ typedef struct RISC6CPUClass {
 
 /* was GP regs + CR regs + PC */
 
-/* r0-15, flags, H, SPC, PC */
-#define NUM_CORE_REGS (16+4) 
+/* r0-r9, ra, rb, mt, sb, sp ,lr , rc, rv, rn, rz, rh, xc, pc */
+#define NUM_CORE_REGS (16+7) 
 /* was (32 + 32 + 1) */
 
 /* General purpose register aliases */
 
-
-/*
-
-#define R_ZERO   0
-#define R_AT     1
-#define R_RET0   2
-#define R_RET1   3
-#define R_ARG0   4
-#define R_ARG1   5
-#define R_ARG2   6
-#define R_ARG3   7
-#define R_ET     24
-#define R_BT     25
-#define R_GP     26
-#define R_SP     27
-#define R_FP     28
-#define R_EA     29
-#define R_BA     30
-*/
-
-#define R_RA     15
+#define R_0      0
+#define R_1      1
+#define R_2      2
+#define R_3      3
+#define R_4      4
+#define R_5      5
+#define R_6      6
+#define R_7      7
+#define R_8      8 
+#define R_9      9 
+#define R_A      10
+#define R_B      11
+#define R_MT     12
+#define R_SB     13
+#define R_SP     14
+#define R_LR     15
 
 
 
@@ -113,57 +108,17 @@ typedef struct RISC6CPUClass {
 #define CR_IENABLE   (CR_BASE + 0)
 #define CR_IPENDING  (CR_BASE + 0)
 
-/*
-#define CR_ESTATUS   (CR_BASE + 1)
-#define CR_BSTATUS   (CR_BASE + 2)
-#define CR_IENABLE   (CR_BASE + 3)
-#define CR_IPENDING  (CR_BASE + 4)
-#define CR_CPUID     (CR_BASE + 5)
-#define CR_CTL6      (CR_BASE + 6)
-#define CR_EXCEPTION (CR_BASE + 7)
-#define CR_PTEADDR   (CR_BASE + 8)
-#define   CR_PTEADDR_PTBASE_SHIFT 22
-#define   CR_PTEADDR_PTBASE_MASK  (0x3FF << CR_PTEADDR_PTBASE_SHIFT)
-#define   CR_PTEADDR_VPN_SHIFT    2
-#define   CR_PTEADDR_VPN_MASK     (0xFFFFF << CR_PTEADDR_VPN_SHIFT)
-#define CR_TLBACC    (CR_BASE + 9)
-#define   CR_TLBACC_IGN_SHIFT 25
-#define   CR_TLBACC_IGN_MASK  (0x7F << CR_TLBACC_IGN_SHIFT)
-#define   CR_TLBACC_C         (1 << 24)
-#define   CR_TLBACC_R         (1 << 23)
-#define   CR_TLBACC_W         (1 << 22)
-#define   CR_TLBACC_X         (1 << 21)
-#define   CR_TLBACC_G         (1 << 20)
-#define   CR_TLBACC_PFN_MASK  0x000FFFFF
-#define CR_TLBMISC   (CR_BASE + 10)
-#define   CR_TLBMISC_WAY_SHIFT 20
-#define   CR_TLBMISC_WAY_MASK  (0xF << CR_TLBMISC_WAY_SHIFT)
-#define   CR_TLBMISC_RD        (1 << 19)
-#define   CR_TLBMISC_WR        (1 << 18)
-#define   CR_TLBMISC_PID_SHIFT 4
-#define   CR_TLBMISC_PID_MASK  (0x3FFF << CR_TLBMISC_PID_SHIFT)
-#define   CR_TLBMISC_DBL       (1 << 3)
-#define   CR_TLBMISC_BAD       (1 << 2)
-#define   CR_TLBMISC_PERM      (1 << 1)
-#define   CR_TLBMISC_D         (1 << 0)
-#define CR_ENCINJ    (CR_BASE + 11)
-#define CR_BADADDR   (CR_BASE + 12)
-#define CR_CONFIG    (CR_BASE + 13)
-#define CR_MPUBASE   (CR_BASE + 14)
-#define CR_MPUACC    (CR_BASE + 15)
-*/
 
 
 /* Other registers */
 
-#define R_MT         12
-#define R_BP         13
-#define R_SP         14
-#define R_LNK        15
-#define R_FLG        16
-#define R_H          17
-#define R_SPC        18
-#define R_PC         19
+#define R_C          16
+#define R_V          17
+#define R_N          18
+#define R_Z          19
+#define R_H          20
+#define R_XC         21
+#define R_PC         22
 
 /* Exceptions */
 

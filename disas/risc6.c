@@ -97,7 +97,7 @@ void ins2str( unsigned long addr, unsigned long insn, char * dstr){
       break;
     default:
       memcpy( thisop, &BRAOPS[3*instr.a], 3 );
-      if ((insn & 10000000)!=0){
+      if (((insn >> 28)&1)==1){
         thisop[3] = '.';
       }else{
         thisop[3] = ' ';

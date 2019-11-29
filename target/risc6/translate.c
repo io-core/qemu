@@ -591,10 +591,15 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *c
         nop(ctx, insn, i_type_instructions[instr.op].flags);
         break;
       case SUB: 
-        tcg_gen_sub_tl((ctx)->cpu_R[instr.c], load_gpr((ctx), instr.a),load_gpr(ctx, instr.b));
-        tcg_gen_setcond_tl(i_type_instructions[instr.op].flags, ctx->cpu_R[instr.c], ctx->cpu_R[instr.a], ctx->cpu_R[instr.b]);
-        tcg_gen_setcondi_tl(i_type_instructions[instr.op].flags, (ctx)->cpu_R[instr.b], (ctx)->cpu_R[instr.a], instr.imm16.u);                   
- 
+        switch (opx) {
+        case 0:
+          tcg_gen_sub_tl((ctx)->cpu_R[instr.c], load_gpr((ctx), instr.a),load_gpr(ctx, instr.b));
+          tcg_gen_setcond_tl(i_type_instructions[instr.op].flags, ctx->cpu_R[instr.c], ctx->cpu_R[instr.a], ctx->cpu_R[instr.b]);
+          break;
+        case 1:
+          tcg_gen_subi_tl((ctx)->cpu_R[instr.c], load_gpr((ctx), instr.a),instr.imm16.u);
+          tcg_gen_setcondi_tl(i_type_instructions[instr.op].flags, (ctx)->cpu_R[instr.b], (ctx)->cpu_R[instr.a], instr.imm16.u);                   
+        }
    //     gen_sub_CC(ctx->cpu_R[instr.a],ctx->cpu_R[instr.b],ctx->cpu_R[instr.c]);
         break;
       case MUL:  
@@ -616,34 +621,6 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *c
         nop(ctx, insn, i_type_instructions[instr.op].flags);
         break;
       }
-//      memcpy( thisop, &REGOPS[3*instr.op], 3 );
-//      if ((insn & 0x20000000)!=0) {
-//        thisop[3] = '\'';
-//      }else{
-//        thisop[3] = ' ';
-//      }
-//      thisop[4] = '\0';
-//      if (instr.op==0){
-//        printf("first: 0x%08x instr: 0x%08x %s %s     ",ctx->base.pc_first,insn,thisop,regnames[instr.a]);
-//      }else{
-//        printf("first: 0x%08x instr: 0x%08x %s %s %s ",ctx->base.pc_first,insn,thisop,regnames[instr.a],regnames[instr.b]);
-//      }
-//      if (instr.opx == 0){
-//         if ((insn & 0x20000000)==0){
-//           printf("%s\n",regnames[instr.c]);
-//         }else{
-//         if ((insn & 0x10000000)!=0){
-//           printf("H\n");
-//         }else{
-//           printf("flg\n");
-//         }
-//         }
-//      }else{
-//         if ((insn & 0x10000000)!=0){
-//           printf("ffff");
-//         }
-//         printf("%xH\n",instr.imm16.u);
-//      }
       break;
     case 2:
       addr = tcg_temp_new();
@@ -669,10 +646,6 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *c
 
       tcg_temp_free(addr);
       
-//      memcpy( thisop, &MOVOPS[3*ldst], 3 );
-//      thisop[3] = ' ';
-//      thisop[4] = '\0';
-//      printf("first: 0x%08x instr: 0x%08x %s %s %s %d\n",ctx->base.pc_first,insn,thisop,regnames[instr.a],regnames[instr.b],instr.imm16.s);
       break;
     default:
       if (instr.opv == 1){                   /* return address in r15 */
@@ -680,104 +653,94 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *c
       }
 
       l1 = gen_new_label();
+//        TCG_COND_NEVER,
+//        TCG_COND_EQ,      eq:  Z 
+//        TCG_COND_LE,      le:  Z | (N ^ V) -> Z | N 
+//        TCG_COND_LT,      lt:  N ^ V -> N 
+//        TCG_COND_EQ,      leu: C | Z -> Z 
+//        TCG_COND_NEVER,   ltu: C -> 0 
+//        TCG_COND_LT,      neg: N 
+//        TCG_COND_NEVER,   vs:  V -> 0 
+//        TCG_COND_ALWAYS,
+//        TCG_COND_NE,      ne:  !Z 
+//        TCG_COND_GT,      gt:  !(Z | (N ^ V)) -> !(Z | N) 
+//        TCG_COND_GE,      ge:  !(N ^ V) -> !N 
+//        TCG_COND_NE,      gtu: !(C | Z) -> !Z 
+//        TCG_COND_ALWAYS,  geu: !C -> 1 
+//        TCG_COND_GE,      pos: !N 
+//        TCG_COND_ALWAYS,  vc:  !V -> 1 
 
       switch (instr.a){
       case BMI:
         tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
-        ret = DISAS_TB_JUMP;
         break;
       case BEQ:
         tcg_gen_brcond_tl(TCG_COND_EQ, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
-        ret = DISAS_TB_JUMP;
         break;
       case BCS:
         tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
-        ret = DISAS_TB_JUMP;
         break;
       case BVS:
         tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
-        ret = DISAS_TB_JUMP;
         break;
       case BLS:
         tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
-        ret = DISAS_TB_JUMP;
         break;
       case BLT:
         tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
-        ret = DISAS_TB_JUMP;
         break;
       case BLE:
         tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         break;
       case BR: 
         tcg_gen_brcond_tl(TCG_COND_ALWAYS, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
-        ret = DISAS_TB_JUMP;
-//        if (instr.opu == 0) {                     /* dest in register c */
-//          tcg_gen_mov_tl(ctx->cpu_R[R_PC], ctx->cpu_R[instr.c]);
-//        }else{                                      /* dest pc relative */
-//          gen_goto_tb(ctx, 0, ctx->base.tb->pc + 4 + (instr.imm24.s << 2));
-//        }
-//        ret = DISAS_TB_JUMP;
         break;
       case BPL:
         tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
-        ret = DISAS_TB_JUMP;
         break;
       case BNE:
         tcg_gen_brcond_tl(TCG_COND_NE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
-        ret = DISAS_TB_JUMP;
         break;
       case BCC:
         tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
-        ret = DISAS_TB_JUMP;
         break;
       case BVC:
         tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
-        ret = DISAS_TB_JUMP;
         break;
       case BHI:
         tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
-        ret = DISAS_TB_JUMP;
         break;
       case BGE:
         tcg_gen_brcond_tl(TCG_COND_GE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
-        ret = DISAS_TB_JUMP;
         break;
       case BGT:
         tcg_gen_brcond_tl(TCG_COND_GT, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
-        ret = DISAS_TB_JUMP;
         break;
       case NOP:
         tcg_gen_brcond_tl(TCG_COND_NEVER, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
-        ret = DISAS_TB_JUMP;
-        break;
       }
 
       gen_goto_tb(ctx, 0, ctx->base.tb->pc + 4);
       gen_set_label(l1);
       if (instr.opu == 0) {                     /* dest in register c */
+        printf("RG:");
+//        addr = ctx->cpu_R[instr.c];
+        tcg_gen_mov_i32(ctx->cpu_R[10], ctx->cpu_R[instr.c]);
         tcg_gen_mov_tl(ctx->cpu_R[R_PC], ctx->cpu_R[instr.c]);
+
+//        tcg_gen_mov_tl(ctx->cpu_R[R_PC], ctx->cpu_R[instr.c]);
+//        tcg_gen_exit_tb(null, 0);
+
+//        gen_goto_tb(ctx, 1, load_gpr(ctx, instr.c) );
+       
+        ret = DISAS_JUMP;
       }else{                                      /* dest pc relative */
         gen_goto_tb(ctx, 1, ctx->base.tb->pc + 4 + (instr.imm24.s <<2 ));
+      
+        ret = DISAS_TB_JUMP;
       }
-      ret = DISAS_TB_JUMP;
 
 
-//      memcpy( thisop, &BRAOPS[3*instr.a], 3 );
-//      if ((insn & 10000000)!=0){
-//        thisop[3] = '.';
-//      }else{
-//        thisop[3] = ' ';
-//      }
-//      thisop[4] = '\0';
-
-//      printf("first: 0x%08x instr: 0x%08x %s ",ctx->base.pc_first,insn,thisop);
-
-//      if (instr.opu == 0){
-//        printf("%s\n",regnames[instr.c]);
-//      }else{
-//        printf("0x%08x\n",ctx->base.tb->pc + 4 + (instr.imm24.s << 2));
-//      }
     }
     char dstrbuff[128];
     ins2str( ctx->base.tb->pc, insn, dstrbuff);
@@ -838,7 +801,7 @@ static void risc6_tr_init_disas_context(DisasContextBase *dcbase, CPUState *cs)
 
    
 
-    ctx->base.max_insns = 1; //page_insns;
+    ctx->base.max_insns = page_insns;
 }
 
 static void risc6_tr_tb_start(DisasContextBase *dcbase, CPUState *cs)
@@ -893,6 +856,13 @@ static void risc6_tr_tb_stop(DisasContextBase *dcbase, CPUState *cs)
         gen_goto_tb(ctx, 0, ctx->base.pc_next);
         break;
     case DISAS_NORETURN:
+        break;
+    case DISAS_JUMP:
+        tcg_gen_lookup_and_goto_ptr();
+        break;
+    case DISAS_UPDATE:
+        /* The jump will already have updated the PC register */
+        tcg_gen_exit_tb(NULL, 0);
         break;
     case DISAS_TB_JUMP:
         break;
