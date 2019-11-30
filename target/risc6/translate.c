@@ -70,13 +70,11 @@ typedef struct RISC6Instruction {
     uint32_t  flags;
 } RISC6Instruction;
 
-TCGv_i32 cpu_CF, cpu_NF, cpu_VF, cpu_ZF;
+//TCGv_i32 cpu_CF, cpu_NF, cpu_VF, cpu_ZF;
+static TCGv cpu_R[NUM_CORE_REGS];
+//static TCGv cpu_PSW_C;
+//static TCGv cpu_PSW_V;
 
-
-static TCGv load_gpr(DisasContext *dc, uint8_t reg)
-{
-        return dc->cpu_R[reg];
-}
 
 
 static bool use_goto_tb(DisasContext *dc, uint32_t dest)
@@ -88,8 +86,6 @@ static bool use_goto_tb(DisasContext *dc, uint32_t dest)
     return (dc->base.tb->pc & TARGET_PAGE_MASK) == (dest & TARGET_PAGE_MASK);
 }
 
-
-// keep
 static void gen_goto_tb(DisasContext *dc, int n, uint32_t dest)
 {
     TranslationBlock *tb = dc->base.tb;
@@ -104,362 +100,14 @@ static void gen_goto_tb(DisasContext *dc, int n, uint32_t dest)
     }
 }
 
-
-// keep
 static void nop(DisasContext *dc, uint32_t code, uint32_t flags)
 {
     /* Nothing to do here */
 }
 
-static void mov(DisasContext *dc, uint32_t code, uint32_t flags)
-{
-    I_TYPE(instr, code);
-
-
-    TCGv data;
-        data = dc->cpu_R[instr.a];
-    if (instr.opx == 0){                   /* register */
-     if (instr.opu == 0){
-      if (instr.opv == 0) {
-         tcg_gen_mov_tl(dc->cpu_R[instr.a], dc->cpu_R[17]);
-      }else{
-         tcg_gen_mov_tl(dc->cpu_R[instr.a], dc->cpu_R[16]);
-      }
-     }else{
-         tcg_gen_mov_tl(dc->cpu_R[instr.a], dc->cpu_R[instr.c]);
-     }
-    }else{                                /* immediate */
-     if (instr.opu == 0){
-      if (instr.opv == 0) {
-        tcg_gen_andi_tl(data, load_gpr(dc, instr.a), 0x00000000);
-      }else{
-        tcg_gen_andi_tl(data, load_gpr(dc, instr.a), 0x00000000);
-        tcg_gen_ori_tl(data, load_gpr(dc, instr.a), 0xFFFF0000);
-      }
-      tcg_gen_addi_tl(data, load_gpr(dc, instr.a), instr.imm16.u);
-     }else{
-      tcg_gen_andi_tl(data, load_gpr(dc, instr.a), 0x0000FFFF);
-      tcg_gen_addi_tl(data, load_gpr(dc, instr.a), instr.imm16.u << 16);
-     }
-     // and also test for zero and negative
-    }
-
-
-}
-
-
-
-
-/*
- * I-Type instructions
- */
-/* Load instructions */
-static void gen_ldx(DisasContext *dc, uint32_t code, uint32_t flags)
-{
-    I_TYPE(instr, code);
-
-    TCGv addr = tcg_temp_new();
-    TCGv data;
-        data = dc->cpu_R[instr.b];
-    tcg_gen_addi_tl(addr, load_gpr(dc, instr.a), instr.imm16.s);
-    tcg_gen_qemu_ld_tl(data, addr, dc->mem_idx, flags);
-
-    tcg_temp_free(addr);
-}
-
-/* Store instructions */
-static void gen_stx(DisasContext *dc, uint32_t code, uint32_t flags)
-{
-    I_TYPE(instr, code);
-    TCGv val = load_gpr(dc, instr.b);
-
-    TCGv addr = tcg_temp_new();
-    tcg_gen_addi_tl(addr, load_gpr(dc, instr.a), instr.imm16.s);
-    tcg_gen_qemu_st_tl(val, addr, dc->mem_idx, flags);
-    tcg_temp_free(addr);
-}
-
-/* Branch instructions */
-static void br(DisasContext *dc, uint32_t code, uint32_t flags)
-{
-    I_TYPE(instr, code);
-
-    if (instr.opv == 1){                   /* return address in r15 */
-      tcg_gen_movi_tl(dc->cpu_R[R_RA], dc->base.tb->pc + 4);
-    } 
-
-    if (instr.opu == 0) {                     /* dest in register c */
-      tcg_gen_mov_tl(dc->cpu_R[R_PC], dc->cpu_R[instr.c]);
-    }else{                                      /* dest pc relative */
-      gen_goto_tb(dc, 0, dc->base.tb->pc + 4 + (instr.imm24.s << 2));
-    }
-    dc->base.is_jmp = DISAS_TB_JUMP;
-}
-
-
-/* Comparison instructions */
-#define gen_i_cmpxx(fname, op3)                                              \
-static void (fname)(DisasContext *dc, uint32_t code, uint32_t flags)         \
-{                                                                            \
-    I_TYPE(instr, (code));                                                   \
-    tcg_gen_setcondi_tl(flags, (dc)->cpu_R[instr.b], (dc)->cpu_R[instr.a],   \
-                        (op3));                                              \
-}
-
-
-/* Math/logic instructions */
-#define gen_i_math_logic(fname, insn, resimm, op3)                          \
-static void (fname)(DisasContext *dc, uint32_t code, uint32_t flags)        \
-{                                                                           \
-    I_TYPE(instr, (code));                                                  \
-        tcg_gen_##insn##_tl((dc)->cpu_R[instr.b], (dc)->cpu_R[instr.a],     \
-                            (op3));                                         \
-}
-
-gen_i_math_logic(addi,  addi, 1, instr.imm16.s)
-gen_i_math_logic(muli,  muli, 0, instr.imm16.s)
-
-gen_i_math_logic(andi,  andi, 0, instr.imm16.u)
-gen_i_math_logic(ori,   ori,  1, instr.imm16.u)
-gen_i_math_logic(xori,  xori, 1, instr.imm16.u)
-
-
-
-/* Math/logic instructions */
-#define gen_r_math_logic(fname, insn, op3)                                 \
-static void (fname)(DisasContext *dc, uint32_t code, uint32_t flags)       \
-{                                                                          \
-    I_TYPE(instr, (code));                                                 \
-        tcg_gen_##insn((dc)->cpu_R[instr.c], load_gpr((dc), instr.a),      \
-                       (op3));                                             \
-}
-
-//gen_r_math_logic(add,  add_tl,   load_gpr(dc, instr.b))
-gen_r_math_logic(sub,  sub_tl,   load_gpr(dc, instr.b))
-//gen_r_math_logic(mul,  mul_tl,   load_gpr(dc, instr.b))
-
-//gen_r_math_logic(and,  and_tl,   load_gpr(dc, instr.b))
-//gen_r_math_logic(or,   or_tl,    load_gpr(dc, instr.b))
-//gen_r_math_logic(xor,  xor_tl,   load_gpr(dc, instr.b))
-//gen_r_math_logic(nor,  nor_tl,   load_gpr(dc, instr.b))
-
-
-
-
-#define gen_r_mul(fname, insn)                                         \
-static void (fname)(DisasContext *dc, uint32_t code, uint32_t flags)   \
-{                                                                      \
-    I_TYPE(instr, (code));                                             \
-        TCGv t0 = tcg_temp_new();                                      \
-        tcg_gen_##insn(t0, dc->cpu_R[instr.c],                         \
-                       load_gpr(dc, instr.a), load_gpr(dc, instr.b)); \
-        tcg_temp_free(t0);                                             \
-}
-
-
-
-#define gen_r_shift_s(fname, insn)                                         \
-static void (fname)(DisasContext *dc, uint32_t code, uint32_t flags)       \
-{                                                                          \
-    I_TYPE(instr, (code));                                                 \
-        TCGv t0 = tcg_temp_new();                                          \
-        tcg_gen_andi_tl(t0, load_gpr((dc), instr.b), 31);                  \
-        tcg_gen_##insn((dc)->cpu_R[instr.c], load_gpr((dc), instr.a), t0); \
-        tcg_temp_free(t0);                                                 \
-}
-
-
-gen_r_shift_s(srl, shr_tl)
-gen_r_shift_s(sll, shl_tl)
-
-gen_r_shift_s(ror, rotr_tl)
-
-
-static void divu(DisasContext *dc, uint32_t code, uint32_t flags)
-{
-    I_TYPE(instr, (code));
-
-
-    TCGv t0 = tcg_temp_new();
-    TCGv t1 = tcg_temp_new();
-    TCGv t2 = tcg_const_tl(0);
-    TCGv t3 = tcg_const_tl(1);
-
-    tcg_gen_ext32u_tl(t0, load_gpr(dc, instr.a));
-    tcg_gen_ext32u_tl(t1, load_gpr(dc, instr.b));
-    tcg_gen_movcond_tl(TCG_COND_EQ, t1, t1, t2, t3, t1);
-    tcg_gen_divu_tl(dc->cpu_R[instr.c], t0, t1);
-    tcg_gen_ext32s_tl(dc->cpu_R[instr.c], dc->cpu_R[instr.c]);
-
-    tcg_temp_free(t3);
-    tcg_temp_free(t2);
-    tcg_temp_free(t1);
-    tcg_temp_free(t0);
-}
-
-
-static const RISC6Instruction i_type_instructions[] = {
-
-    INSTRUCTION(mov),                                 /* mov */
-    INSTRUCTION(sll),                                 /* lsl */
-    INSTRUCTION(srl),                                 /* asr */
-    INSTRUCTION(ror),                                 /* ror */
-    INSTRUCTION(andi),                                /* and */
-    INSTRUCTION(nop),                                 /* ann */
-    INSTRUCTION(ori),                                 /* ior */
-    INSTRUCTION(xori),                                /* xor */
-    INSTRUCTION(addi),                                /* add */
-    INSTRUCTION(sub),                                 /* sub */
-    INSTRUCTION(muli),                                /* mul */
-    INSTRUCTION(divu),                                /* div */
-    INSTRUCTION(nop),                                 /* fad */
-    INSTRUCTION(nop),                                 /* fsb */
-    INSTRUCTION(nop),                                 /* fml */
-    INSTRUCTION(nop),                                 /* fdv */
-
-    INSTRUCTION_FLG(gen_ldx, MO_SW),                  /* ldr */
-    INSTRUCTION_FLG(gen_ldx, MO_SB),                  /* ldb */
-    INSTRUCTION_FLG(gen_stx, MO_UW),                  /* str */
-    INSTRUCTION_FLG(gen_stx, MO_UB),                  /* stb */
-
-    INSTRUCTION(br),                                 /* bmi */
-    INSTRUCTION(br),                                 /* beq */
-    INSTRUCTION(br),                                 /* bcs */
-    INSTRUCTION(br),                                 /* bvs */
-    INSTRUCTION(br),                                 /* bls*/
-    INSTRUCTION(br),                                 /* blt */
-    INSTRUCTION(br),                                 /* ble */
-    INSTRUCTION(br),                                  /* b   */
-    INSTRUCTION(br),                                 /* bpl */
-    INSTRUCTION(br),                                 /* bne */
-    INSTRUCTION(br),                                 /* bcc */
-    INSTRUCTION(br),                                 /* bvc */
-    INSTRUCTION(br),                                 /* bhi */
-    INSTRUCTION(br),                                 /* bge */
-    INSTRUCTION(br),                                 /* bgt */
-    INSTRUCTION(nop),                                 /* nop */
-
-
-};
-
-/*
-static const char * const regnames[] = {
-    "r0",         "r1",         "r2",         "r3",
-    "r4",         "r5",         "r6",         "r7",
-    "r8",         "r9",         "r10",        "r11",
-    "r12",        "r13",        "r14",        "r15",
-    "flg",        "H",          "spc",        "pc"
-};
-*/
-
-static TCGv cpu_R[NUM_CORE_REGS];
 
 #include "exec/gen-icount.h"
 
-/*
-static void gen_exception(DisasContext *dc, uint32_t excp)
-{
-    TCGv_i32 tmp = tcg_const_i32(excp);
-
-    tcg_gen_movi_tl(cpu_R[R_PC], dc->pc);
-    gen_helper_raise_exception(cpu_env, tmp);
-    tcg_temp_free_i32(tmp);
-    dc->base.is_jmp = DISAS_UPDATE;
-
-}
-*/
-
-/* generate intermediate code for basic block 'tb'.  
-void old_gen_intermediate_code(CPUState *cs, TranslationBlock *tb, int max_insns)
-{
-    CPURISC6State *env = cs->env_ptr;
-    DisasContext dc1, *dc = &dc1;
-    int num_insns;
-
-    // Initialize DC 
-    dc->cpu_env = cpu_env;
-    dc->cpu_R   = cpu_R;
-    dc->base.is_jmp  = DISAS_NEXT;
-    dc->pc      = tb->pc;
-    dc->base.tb = tb;
-    dc->mem_idx = cpu_mmu_index(env, false);
-    dc->base.singlestep_enabled = cs->singlestep_enabled;
-
-    // Set up instruction counts 
-    num_insns = 0;
-    if (max_insns > 1) {
-        int page_insns = (TARGET_PAGE_SIZE - (tb->pc & TARGET_PAGE_MASK)) / 4;
-        if (max_insns > page_insns) {
-            max_insns = page_insns;
-        }
-    }
-
-    gen_tb_start(tb);
-    do {
-        tcg_gen_insn_start(dc->pc);
-        num_insns++;
-
-        if (unlikely(cpu_breakpoint_test(cs, dc->pc, BP_ANY))) {
-            gen_exception(dc, EXCP_DEBUG);
-            // The address covered by the breakpoint must be included in
-            // [tb->pc, tb->pc + tb->size) in order to for it to be
-            // properly cleared -- thus we increment the PC here so that
-            // the logic setting tb->size below does the right thing.  
-            dc->pc += 4;
-            break;
-        }
-
-        if (num_insns == max_insns && (tb_cflags(tb) & CF_LAST_IO)) {
-            gen_io_start();
-        }
-
-        // Decode an instruction 
-        handle_instruction(dc, env);
-
-        dc->pc += 4;
-
-        // Translation stops when a conditional branch is encountered.
-        // Otherwise the subsequent code could get translated several times.
-        // Also stop translation when a page boundary is reached.  This
-        // ensures prefetch aborts occur at the right place.  
-    } while (!dc->base.is_jmp &&
-             !tcg_op_buf_full() &&
-             num_insns < max_insns);
-
-    if (tb_cflags(tb) & CF_LAST_IO) {
-        gen_io_end();
-    }
-
-    // Indicate where the next block should start 
-    switch (dc->base.is_jmp) {
-    case DISAS_NEXT:
-        // Save the current PC back into the CPU register 
-        tcg_gen_movi_tl(cpu_R[R_PC], dc->pc);
-        tcg_gen_exit_tb(NULL, 0);
-        break;
-
-    default:
-    case DISAS_JUMP:
-    case DISAS_UPDATE:
-        // The jump will already have updated the PC register 
-        tcg_gen_exit_tb(NULL, 0);
-        break;
-
-    case DISAS_TB_JUMP:
-        // nothing more to generate 
-        break;
-    }
-
-    // End off the block 
-    gen_tb_end(tb, num_insns);
-
-    // Mark instruction starts for the final generated instruction 
-    tb->size = dc->pc - tb->pc;
-    tb->icount = num_insns;
-
-}
-
-*/
 
 void risc6_cpu_dump_state(CPUState *cs, FILE *f, int flags)
 {
@@ -479,26 +127,6 @@ void risc6_cpu_dump_state(CPUState *cs, FILE *f, int flags)
     qemu_fprintf(f, "\n\n");
 }
 
-///------------------------------
-
-
-
-/* dest = T0 - T1. Compute C, N, V and Z flags */
-/*
-static void gen_sub_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
-{
-    TCGv_i32 tmp;
-//    tcg_gen_sub_i32(cpu_NF, t0, t1);
-//    tcg_gen_mov_i32(cpu_ZF, cpu_NF);
-//    tcg_gen_setcond_i32(TCG_COND_GEU, cpu_CF, t0, t1);
-//    tcg_gen_xor_i32(cpu_VF, cpu_NF, t0);
-    tmp = tcg_temp_new_i32();
-    tcg_gen_xor_i32(tmp, t0, t1);
-    tcg_gen_and_i32(cpu_VF, cpu_VF, tmp);
-    tcg_temp_free_i32(tmp);
-//    tcg_gen_mov_i32(dest, cpu_NF);
-}
-*/
 
 void risc6_tcg_init(void)
 {
@@ -512,144 +140,160 @@ void risc6_tcg_init(void)
 }
 
 
-static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *cs){
-    DisasJumpType ret;
-    uint8_t opx;
-    uint32_t ldst;
-    TCGv addr;
+static void risc6_translate_regop(DisasContextBase *dcbase, CPUState *cs, uint32_t insn){
+
     TCGv data;
-    TCGv val;
-    TCGLabel *l1;
-
-//    char * thisop;
-//    char opbuff[5];
-
-//    thisop = opbuff;
-
-    ret = DISAS_NEXT;
+    TCGv cval;
+    uint8_t opx;
     opx = insn >> 30;
+    DisasContext *ctx = container_of(dcbase, DisasContext, base);
 
-    ctx->zero = NULL;
 
     I_TYPE(instr, insn);
 
-    
-    switch (opx ){
-    case 0:
-    case 1: 
+      cval = tcg_temp_new_i32();
+      switch (opx) {
+      case 0:
+        tcg_gen_mov_tl(cval, cpu_R[instr.c]);
+        break;
+      case 1:
+        tcg_gen_movi_tl(cval, instr.imm16.u);
+      }
+
       switch (instr.op){
       case MOV:  
-        data = ctx->cpu_R[instr.a];
+        data = cpu_R[instr.a];
         if (instr.opx == 0){                   /* register */
          if (instr.opu == 0){
           if (instr.opv == 0) {
-             tcg_gen_mov_tl(ctx->cpu_R[instr.a], ctx->cpu_R[R_H]);
+             tcg_gen_mov_tl(cpu_R[instr.a], cpu_R[R_H]);
           }else{
-             tcg_gen_mov_tl(ctx->cpu_R[instr.a], ctx->cpu_R[R_FLG]);
+//             tcg_gen_mov_tl(cpu_R[instr.a], cpu_R[R_FLG]);
           }
          }else{
-             tcg_gen_mov_tl(ctx->cpu_R[instr.a], ctx->cpu_R[instr.c]);
+             tcg_gen_mov_tl(cpu_R[instr.a], cpu_R[instr.c]);
          }
         }else{                                /* immediate */
          if (instr.opu == 0){
           if (instr.opv == 0) {
-            tcg_gen_andi_tl(data, load_gpr(ctx, instr.a), 0x00000000);
+            tcg_gen_andi_tl(data, cpu_R[instr.a], 0x00000000);
           }else{
-            tcg_gen_andi_tl(data, load_gpr(ctx, instr.a), 0x00000000);
-            tcg_gen_ori_tl(data, load_gpr(ctx, instr.a), 0xFFFF0000);
+            tcg_gen_andi_tl(data, cpu_R[instr.a], 0x00000000);
+            tcg_gen_ori_tl(data, cpu_R[instr.a], 0xFFFF0000);
           }
-          tcg_gen_addi_tl(data, load_gpr(ctx, instr.a), instr.imm16.u);
+          tcg_gen_addi_tl(data, cpu_R[instr.a], instr.imm16.u);
          }else{
-          tcg_gen_andi_tl(data, load_gpr(ctx, instr.a), 0x0000FFFF);
-          tcg_gen_addi_tl(data, load_gpr(ctx, instr.a), instr.imm16.u << 16);
+          tcg_gen_andi_tl(data, cpu_R[instr.a], 0x0000FFFF);
+          tcg_gen_addi_tl(data, cpu_R[instr.a], instr.imm16.u << 16);
          }
          // and also test for zero and negative
         }
         break;
       case LSL:  
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        nop(ctx, insn, 0);
         break;
       case ASR:  
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        nop(ctx, insn, 0);
         break;
       case ROR:  
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        tcg_gen_rotr_tl(cpu_R[instr.a], cpu_R[instr.b], cval);
         break;
       case AND:  
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        nop(ctx, insn, 0);
         break;
       case ANN:  
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        nop(ctx, insn, 0);
         break;
       case IOR:  
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        nop(ctx, insn, 0);
         break;
       case XOR:  
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        nop(ctx, insn, 0);
         break;
       case ADD:  
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+//        data = tcg_temp_new_i32();
+        tcg_gen_add_tl(cpu_R[instr.a], cpu_R[instr.b], cval);
+        tcg_gen_setcond_tl(TCG_COND_GT, cpu_R[R_C], cpu_R[instr.a], cpu_R[instr.b]);
+//        tcg_gen_mov_tl(cpu_R[instr.a], data);
+//        tcg_temp_free(data);
         break;
-      case SUB: 
-        switch (opx) {
-        case 0:
-          tcg_gen_sub_tl((ctx)->cpu_R[instr.c], load_gpr((ctx), instr.a),load_gpr(ctx, instr.b));
-          tcg_gen_setcond_tl(i_type_instructions[instr.op].flags, ctx->cpu_R[instr.c], ctx->cpu_R[instr.a], ctx->cpu_R[instr.b]);
-          break;
-        case 1:
-          tcg_gen_subi_tl((ctx)->cpu_R[instr.c], load_gpr((ctx), instr.a),instr.imm16.u);
-          tcg_gen_setcondi_tl(i_type_instructions[instr.op].flags, (ctx)->cpu_R[instr.b], (ctx)->cpu_R[instr.a], instr.imm16.u);                   
-        }
-   //     gen_sub_CC(ctx->cpu_R[instr.a],ctx->cpu_R[instr.b],ctx->cpu_R[instr.c]);
+      case SUB:
+//        data = tcg_temp_new_i32();
+        tcg_gen_sub_tl(cpu_R[instr.a], cpu_R[instr.b],cval);
+        tcg_gen_setcond_tl(TCG_COND_LT, cpu_R[R_C], cpu_R[instr.a], cpu_R[instr.b]);
+//        tcg_gen_mov_tl(cpu_R[instr.a], data);
+//        tcg_temp_free(data);
         break;
       case MUL:  
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        nop(ctx, insn, 0);
         break;
       case DIV:  
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        nop(ctx, insn, 0);
         break;
       case FAD:  
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        nop(ctx, insn, 0);
         break;
       case FSB:  
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        nop(ctx, insn, 0);
         break;
       case FML:  
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
+        nop(ctx, insn, 0);
         break;
       case FDV:  
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
-        break;
-      }
-      break;
-    case 2:
-      addr = tcg_temp_new();
-      ldst = (instr.opu << 1) + ((insn >> 28) & 1);
-      switch(ldst){
-      case LDR: 
-        data = ctx->cpu_R[instr.b];
-        tcg_gen_addi_tl(addr, load_gpr(ctx, instr.a), instr.imm16.s);
-        tcg_gen_qemu_ld_tl(data, addr, ctx->mem_idx, i_type_instructions[instr.op].flags);
-        break;    
-      case LDB:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);
-        break;
-      case STR:
-        val = load_gpr(ctx, instr.b);
-        tcg_gen_addi_tl(addr, load_gpr(ctx, instr.a), instr.imm16.s);
-        tcg_gen_qemu_st_tl(val, addr, ctx->mem_idx, i_type_instructions[instr.op].flags);
-        break;
-      case STB:
-        nop(ctx, insn, i_type_instructions[instr.op].flags);   
+        nop(ctx, insn, 0);
         break;
       }
 
-      tcg_temp_free(addr);
-      
+
+     
+
+      tcg_gen_setcondi_tl(TCG_COND_EQ, cpu_R[R_Z], cpu_R[instr.a], 0x00);
+      tcg_gen_setcondi_tl(TCG_COND_LT, cpu_R[R_N], cpu_R[instr.a], 0x00);
+
+      tcg_temp_free(cval);
+
+
+}
+
+static void risc6_translate_memop(DisasContextBase *dcbase, CPUState *cs, uint32_t insn){
+
+    DisasContext *ctx = container_of(dcbase, DisasContext, base);
+
+    I_TYPE(instr, insn);
+
+    TCGv addr = tcg_temp_new();
+    TCGv val = cpu_R[instr.a];
+    tcg_gen_addi_tl(addr, cpu_R[instr.b], instr.imm16.s);
+
+    switch((insn >> 28) & 3){
+    case LDR:
+      tcg_gen_qemu_ld32u(val, addr, ctx->mem_idx);
       break;
-    default:
+    case LDB:
+      tcg_gen_qemu_ld8u(val, addr, ctx->mem_idx);
+      break;
+    case STR:
+      tcg_gen_qemu_st32(val, addr, ctx->mem_idx);
+      break;
+    case STB:
+      tcg_gen_qemu_st8(val, addr, ctx->mem_idx);
+      break;
+    }
+
+    tcg_temp_free(addr);
+}
+
+static void risc6_translate_braop(DisasContextBase *dcbase, CPUState *cs, uint32_t insn){
+
+    TCGLabel *l1;
+
+    DisasContext *ctx = container_of(dcbase, DisasContext, base);
+
+    I_TYPE(instr, insn);
+
+
       if (instr.opv == 1){                   /* return address in r15 */
-        tcg_gen_movi_tl(ctx->cpu_R[R_RA], ctx->base.tb->pc + 4);
+        tcg_gen_movi_tl(cpu_R[R_LR], dcbase->tb->pc + 4);
       }
 
       l1 = gen_new_label();
@@ -670,138 +314,127 @@ static DisasJumpType translate_one(DisasContext *ctx, uint32_t insn, CPUState *c
 //        TCG_COND_GE,      pos: !N 
 //        TCG_COND_ALWAYS,  vc:  !V -> 1 
 
+// Risc6 comparisons:
+// *0000 MI negative (minus)  N       *1000 PL positive (plus)  ~N
+// *0001 EQ equal (zero)      Z       *1001 NE positive (plus)  ~Z
+// *0010 CS carry set (lower) C       *1010 CC carry clear      ~C
+// *0011 VS overflow set      V       *1011 VC overflow clear   ~V
+// *0100 LS lower or same     ~C|Z     1100 HI higher           ~(~C}Z)      
+// *0101 LT less than        N!=V     *1101 GE greater or equal ~(N!=V)
+// *0110 LE less or equal    (N!=V)|Z  1110 GT greater than     ~((N!=V)|Z)
+// *0111    always            true    *1111    never            false
+
       switch (instr.a){
-      case BMI:
-        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
+      case BMI: // ok
+        tcg_gen_brcondi_tl(TCG_COND_EQ, cpu_R[R_N], 1, l1);
         break;
-      case BEQ:
-        tcg_gen_brcond_tl(TCG_COND_EQ, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
+      case BEQ: // ok
+        tcg_gen_brcondi_tl(TCG_COND_EQ, cpu_R[R_Z], 1, l1);
         break;
-      case BCS:
-        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
+      case BCS: // ok
+        tcg_gen_brcondi_tl(TCG_COND_EQ, cpu_R[R_C], 1, l1);
         break;
-      case BVS:
-        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
+      case BVS: // ok
+        tcg_gen_brcondi_tl(TCG_COND_EQ, cpu_R[R_V], 1, l1);
         break;
-      case BLS:
-        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
+      case BLS: // ok
+        tcg_gen_brcondi_tl(TCG_COND_EQ, cpu_R[R_C], 0, l1);
+        tcg_gen_brcondi_tl(TCG_COND_EQ, cpu_R[R_Z], 1, l1);
         break;
-      case BLT:
-        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
+      case BLT: // ok 
+        tcg_gen_brcond_tl(TCG_COND_NE, cpu_R[R_N], ctx->cpu_R[R_V], l1);
         break;
-      case BLE:
-        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
+      case BLE: // ok 
+        tcg_gen_brcond_tl(TCG_COND_NE, cpu_R[R_N], ctx->cpu_R[R_V], l1);
+        tcg_gen_brcondi_tl(TCG_COND_EQ, cpu_R[R_Z], 1, l1);
         break;
-      case BR: 
-        tcg_gen_brcond_tl(TCG_COND_ALWAYS, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
+      case BR:  // ok
+        tcg_gen_brcond_tl(TCG_COND_ALWAYS, cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
         break;
-      case BPL:
-        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
+      case BPL: // ok
+        tcg_gen_brcondi_tl(TCG_COND_EQ, cpu_R[R_N], 0, l1);
         break;
-      case BNE:
-        tcg_gen_brcond_tl(TCG_COND_NE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
+      case BNE: // ok
+        tcg_gen_brcondi_tl(TCG_COND_EQ, cpu_R[R_Z], 0, l1);
         break;
-      case BCC:
-        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
+      case BCC: // ok
+        tcg_gen_brcondi_tl(TCG_COND_EQ, cpu_R[R_C], 0, l1);
         break;
-      case BVC:
-        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
+      case BVC: // ok
+        tcg_gen_brcondi_tl(TCG_COND_EQ, cpu_R[R_V], 0, l1);
         break;
-      case BHI:
-        tcg_gen_brcond_tl(TCG_COND_LE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
+      case BHI: 
+        
         break;
-      case BGE:
-        tcg_gen_brcond_tl(TCG_COND_GE, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
+      case BGE: // ok
+        tcg_gen_brcond_tl(TCG_COND_EQ, cpu_R[R_N], ctx->cpu_R[R_V], l1);
         break;
-      case BGT:
-        tcg_gen_brcond_tl(TCG_COND_GT, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
+      case BGT: 
+        
         break;
-      case NOP:
-        tcg_gen_brcond_tl(TCG_COND_NEVER, ctx->cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
+      case NOP: // ok
+        tcg_gen_brcond_tl(TCG_COND_NEVER, cpu_R[instr.a], ctx->cpu_R[instr.b], l1);
       }
 
-      gen_goto_tb(ctx, 0, ctx->base.tb->pc + 4);
+      gen_goto_tb(ctx, 0, dcbase->tb->pc + 4);
       gen_set_label(l1);
       if (instr.opu == 0) {                     /* dest in register c */
-        printf("RG:");
-//        addr = ctx->cpu_R[instr.c];
-        tcg_gen_mov_i32(ctx->cpu_R[10], ctx->cpu_R[instr.c]);
-        tcg_gen_mov_tl(ctx->cpu_R[R_PC], ctx->cpu_R[instr.c]);
-
-//        tcg_gen_mov_tl(ctx->cpu_R[R_PC], ctx->cpu_R[instr.c]);
-//        tcg_gen_exit_tb(null, 0);
-
-//        gen_goto_tb(ctx, 1, load_gpr(ctx, instr.c) );
-       
-        ret = DISAS_JUMP;
+        tcg_gen_mov_tl(cpu_R[R_PC], ctx->cpu_R[instr.c]); 
+        dcbase->is_jmp = DISAS_JUMP;
       }else{                                      /* dest pc relative */
-        gen_goto_tb(ctx, 1, ctx->base.tb->pc + 4 + (instr.imm24.s <<2 ));
-      
-        ret = DISAS_TB_JUMP;
+        gen_goto_tb(ctx, 1, dcbase->tb->pc + 4 + (instr.imm24.s <<2 ));
+        tcg_gen_movi_tl(cpu_R[R_PC], dcbase->tb->pc + 4 + (instr.imm24.s <<2 ));
+        dcbase->is_jmp = DISAS_TB_JUMP;
       }
 
+      dcbase->pc_next = dcbase->tb->pc + 4;
 
+
+}
+
+
+static void risc6_tr_translate_insn (DisasContextBase *dcbase, CPUState *cs){
+    uint32_t insn=translator_ldl(cs->env_ptr,dcbase->tb->pc);
+
+    dcbase->pc_next += 4;
+    dcbase->is_jmp = DISAS_NEXT;
+
+    switch (insn >> 30){
+    case 0:
+    case 1: 
+      risc6_translate_regop (dcbase, cs, insn);
+      break;
+    case 2:
+      risc6_translate_memop (dcbase, cs, insn);
+      break;
+    default:
+      risc6_translate_braop (dcbase, cs, insn);
     }
+
     char dstrbuff[128];
-    ins2str( ctx->base.tb->pc, insn, dstrbuff);
-    printf("first: 0x%08x instr: %s\n",ctx->base.pc_first,dstrbuff);
+    ins2str( dcbase->tb->pc, insn, dstrbuff);
+    printf("first: 0x%08x addr: 0x%08x instr: %s\n",dcbase->pc_first,dcbase->tb->pc,dstrbuff);
 
-
-    ctx->base.num_insns=ctx->base.num_insns+1;
-    if (ctx->base.num_insns >= ctx->base.max_insns ){
-        ret = DISAS_TOO_MANY;
+    dcbase->tb->pc = dcbase->tb->pc + 4;
+    dcbase->num_insns=dcbase->num_insns+1;
+    if (dcbase->num_insns >= 40 ){ //dcbase->max_insns ){
+        dcbase->is_jmp = DISAS_TOO_MANY;
     }
-
-
-    if (ctx->zero) {
-        tcg_temp_free(ctx->zero);
-    }
-
-    return ret;
 }
 
 static void risc6_tr_init_disas_context(DisasContextBase *dcbase, CPUState *cs)
 {
     DisasContext *ctx = container_of(dcbase, DisasContext, base);
-    CPURISC6State *env = cs->env_ptr;
-//    RISC6CPU *cpu = RISC6_CPU(cs);
-
-// DisasContextBase:
-//    TranslationBlock *tb;
-//    target_ulong pc_first;
-//    target_ulong pc_next;
-//    DisasJumpType is_jmp;
-//    int num_insns;
-//    int max_insns;
-//    bool singlestep_enabled;
-// DisasContext:
-//    DisasContextBase  base
-//    TCGv             *cpu_R;
-//    TCGv_i32          zero;
-//    target_ulong      pc;
-//    int               mem_idx;
-
-//    int num_insns;
     
-
-    /* Initialize DC */
     ctx->cpu_R   = cpu_R;
-//    ctx->pc      = ctx->base.pc_first;
-    ctx->mem_idx = cpu_mmu_index(env, false);
-    ctx->base.singlestep_enabled = cs->singlestep_enabled;
+    ctx->mem_idx = cpu_mmu_index(cs->env_ptr, false);
+    dcbase->singlestep_enabled = cs->singlestep_enabled;
 
-    /* Set up instruction counts */
-    ctx->base.num_insns = 0;
-//    if (ctx->base.max_insns > 1) {
-        int page_insns = (TARGET_PAGE_SIZE - (ctx->base.tb->pc & TARGET_PAGE_MASK)) / 4;
-        if (ctx->base.max_insns > page_insns) {
-            ctx->base.max_insns = page_insns;
-        }
-//    }
-
-   
-
-    ctx->base.max_insns = page_insns;
+    dcbase->num_insns = 0;
+    int page_insns = (TARGET_PAGE_SIZE - (dcbase->tb->pc & TARGET_PAGE_MASK)) / 4;
+    if (dcbase->max_insns > page_insns) {
+        dcbase->max_insns = page_insns;
+    }
 }
 
 static void risc6_tr_tb_start(DisasContextBase *dcbase, CPUState *cs)
@@ -810,42 +443,13 @@ static void risc6_tr_tb_start(DisasContextBase *dcbase, CPUState *cs)
 
 static void risc6_tr_insn_start(DisasContextBase *dcbase, CPUState *cs)
 {
-    DisasContext *ctx = container_of(dcbase, DisasContext, base);
-
-    tcg_gen_insn_start(ctx->base.pc_next);  //, ctx->envflags);
+    tcg_gen_insn_start(container_of(dcbase, DisasContext, base)->base.pc_next);
 }
 
-
-static bool risc6_tr_breakpoint_check(DisasContextBase *dcbase, CPUState *cs,
-                                    const CPUBreakpoint *bp)
+static bool risc6_tr_breakpoint_check(DisasContextBase *dcbase, CPUState *cs, const CPUBreakpoint *bp)
 {
-    DisasContext *ctx = container_of(dcbase, DisasContext, base);
-
-    /* We have hit a breakpoint - make sure PC is up-to-date */
-//    gen_save_cpu_state(ctx, true);
-//    gen_helper_debug(cpu_env);
-    ctx->base.is_jmp = DISAS_NORETURN;
-    /* The address covered by the breakpoint must be included in
-       [tb->pc, tb->pc + tb->size) in order to for it to be
-       properly cleared -- thus we increment the PC here so that
-       the logic setting tb->size below does the right thing.  */
-    ctx->base.pc_next += 4;
     return true;
 }
-
-static void risc6_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
-{
-    CPURISC6State *env = cs->env_ptr;
-    DisasContext *ctx = container_of(dcbase, DisasContext, base);
-    uint32_t insn = translator_ldl(env, ctx->base.pc_next);
-
-    ctx->base.pc_next += 4;
-    ctx->base.is_jmp = translate_one(ctx, insn, cs);
-
-    translator_loop_temp_check(&ctx->base);
-
-}
-
 
 static void risc6_tr_tb_stop(DisasContextBase *dcbase, CPUState *cs)
 {
@@ -853,18 +457,16 @@ static void risc6_tr_tb_stop(DisasContextBase *dcbase, CPUState *cs)
 
     switch (ctx->base.is_jmp) {
     case DISAS_TOO_MANY:
+        printf("DISAS_TOO_MANY\n");
         gen_goto_tb(ctx, 0, ctx->base.pc_next);
         break;
-    case DISAS_NORETURN:
-        break;
     case DISAS_JUMP:
+        printf("DISAS_JUMP\n");
         tcg_gen_lookup_and_goto_ptr();
-        break;
-    case DISAS_UPDATE:
-        /* The jump will already have updated the PC register */
         tcg_gen_exit_tb(NULL, 0);
         break;
     case DISAS_TB_JUMP:
+        printf("DISAS_TB_JUMP\n");
         break;
     default:
         printf("stop code: %d\n",ctx->base.is_jmp);

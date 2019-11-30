@@ -103,6 +103,9 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
 //    printf("RISC6 IO READ OF: %ld\n",addr);
 
     switch (addr) {
+    case R_SPIDATA:
+        r = 0x123456ff;
+	break;
     case R_CONTROL:
         r = t->regs[R_CONTROL] & (CONTROL_ITO | CONTROL_CONT);
         break;
