@@ -417,9 +417,9 @@ static void risc6_tr_translate_insn (DisasContextBase *dcbase, CPUState *cs){
       risc6_translate_braop (dcbase, cs, insn);
     }
 
-    char dstrbuff[128];
-    ins2str( dcbase->tb->pc, insn, dstrbuff);
-    printf("first: 0x%08x addr: 0x%08x instr: %s\n",dcbase->pc_first,dcbase->tb->pc,dstrbuff);
+//    char dstrbuff[128];
+//    ins2str( dcbase->tb->pc, insn, dstrbuff);
+//    printf("first: 0x%08x addr: 0x%08x instr: %s\n",dcbase->pc_first,dcbase->tb->pc,dstrbuff);
 
     dcbase->tb->pc = dcbase->tb->pc + 4;
     dcbase->num_insns=dcbase->num_insns+1;
@@ -463,16 +463,16 @@ static void risc6_tr_tb_stop(DisasContextBase *dcbase, CPUState *cs)
 
     switch (ctx->base.is_jmp) {
     case DISAS_TOO_MANY:
-        printf("DISAS_TOO_MANY\n");
+//        printf("DISAS_TOO_MANY\n");
         gen_goto_tb(ctx, 0, ctx->base.pc_next);
         break;
     case DISAS_JUMP:
-        printf("DISAS_JUMP\n");
+//        printf("DISAS_JUMP\n");
         tcg_gen_lookup_and_goto_ptr();
         tcg_gen_exit_tb(NULL, 0);
         break;
     case DISAS_TB_JUMP:
-        printf("DISAS_TB_JUMP\n");
+//        printf("DISAS_TB_JUMP\n");
         break;
     default:
         printf("stop code: %d\n",ctx->base.is_jmp);

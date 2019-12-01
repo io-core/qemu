@@ -76,13 +76,32 @@
 #define RISC6_TIMER(obj) \
     OBJECT_CHECK(RISC6Timer, (obj), TYPE_RISC6_TIMER)
 
+#define  diskCommand 0
+#define  diskRead    1
+#define  diskWrite   2
+#define  diskWriting 3
+
+
 typedef struct RISC6Timer {
     SysBusDevice  busdev;
     MemoryRegion  mmio;
     qemu_irq      irq;
+    uint32_t      spi_sel;
     uint32_t      freq_hz;
     ptimer_state *ptimer;
     uint32_t      regs[R_MAX];
+
+    uint32_t      disk_state;
+    FILE *        disk_file;
+    uint32_t      disk_offset;
+
+    uint32_t      rx_buf[128];
+    int           rx_idx;
+
+    uint32_t      tx_buf[130];
+    int           tx_cnt;
+    int           tx_idx;
+
 } RISC6Timer;
 
 static int timer_irq_state(RISC6Timer *t)
@@ -91,6 +110,65 @@ static int timer_irq_state(RISC6Timer *t)
                (t->regs[R_CONTROL] & CONTROL_ITO);
     return irq;
 }
+
+
+static uint32_t spi_read(RISC6Timer *t){
+    uint32_t r = 0xFF;
+    if (t->spi_sel == 1 && t->tx_idx >= 0 && t->tx_idx < t->tx_cnt) {
+      r = t->tx_buf[t->tx_idx];
+    }
+    return r;
+}
+
+static void spi_write(RISC6Timer *t, uint32_t value){
+    if (t->spi_sel == 1 ){
+      t->tx_idx++;
+
+      switch (t->disk_state) {
+      case diskCommand: 
+//        if (uint8(value) != 0xFF || board.Disk.rx_idx != 0) {
+//          board.Disk.rx_buf[board.Disk.rx_idx] = value
+//          board.Disk.rx_idx++
+//          if (board.Disk.rx_idx == 6) {
+//           board.disk_run_command()
+//            board.Disk.rx_idx = 0
+//          }
+//        }
+        break;  
+      case diskRead: 
+//        if (board.Disk.tx_idx == board.Disk.tx_cnt) {
+//          board.Disk.state = diskCommand;
+//          board.Disk.tx_cnt = 0;
+//          board.Disk.tx_idx = 0;
+//        }
+        break;
+      case diskWrite: 
+//        if (value == 254) {
+//          board.Disk.state = diskWriting;
+//        }
+        break;
+      case diskWriting: 
+//        if (board.Disk.rx_idx < 128) {
+//          board.Disk.rx_buf[board.Disk.rx_idx] = value;
+//        }
+//        board.Disk.rx_idx++;
+//        if (board.Disk.rx_idx == 128) {
+//       //        write_sector(disk.file, &disk.rx_buf[0]);
+//          board.write_sector()
+//        }
+//        if (board.Disk.rx_idx == 130) {
+//          board.Disk.tx_buf[0] = 5;
+//          board.Disk.tx_cnt = 1;
+//          board.Disk.tx_idx = -1;
+//          board.Disk.rx_idx = 0;
+//          board.Disk.state = diskCommand;
+//        }
+        break;
+      }
+
+    }
+}
+
 
 static uint64_t timer_read(void *opaque, hwaddr addr,
                            unsigned int size)
@@ -103,15 +181,18 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
 //    printf("RISC6 IO READ OF: %ld\n",addr);
 
     switch (addr) {
-    case R_SPIDATA:
-        r = 0x123456ff;
-	break;
     case R_CONTROL:
         r = t->regs[R_CONTROL] & (CONTROL_ITO | CONTROL_CONT);
         break;
-    case R_SPICONTROL:
-	r = 1;
+    case R_SPIDATA:
+	r = spi_read(t);
+        printf("SPI dr %lx\n",r);
 	break;
+
+    case R_SPICONTROL:
+        r = 1;
+        printf("SPI cr %lx\n",r);
+        break;
 
     default:
         if (addr < ARRAY_SIZE(t->regs)) {
@@ -134,6 +215,16 @@ static void timer_write(void *opaque, hwaddr addr,
     addr >>= 2;
 
     switch (addr) {
+    case R_SPIDATA:
+        spi_write(t,value);
+        printf("SPI dw %lx\n",value);
+        break;
+
+    case R_SPICONTROL:
+        printf("SPI cw %ld\n",value & 3);
+        t->spi_sel = value & 3;
+        break;
+
     case R_STATUS:
         /* The timeout bit is cleared by writing the status register. */
         t->regs[R_STATUS] &= ~STATUS_TO;
@@ -249,6 +340,14 @@ static void risc6_timer_reset(DeviceState *dev)
     ptimer_set_limit(t->ptimer, 0xffffffff, 1);
     ptimer_transaction_commit(t->ptimer);
     memset(t->regs, 0, sizeof(t->regs));
+    t->spi_sel = 0;
+    t->disk_state = 0;
+    //disk_file;
+    t->disk_offset = 0;
+    t->rx_idx = 0;
+    t->tx_cnt = 0;
+    t->tx_idx = 0;
+
 }
 
 static Property risc6_timer_properties[] = {
