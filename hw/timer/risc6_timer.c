@@ -32,13 +32,15 @@
 #include "hw/irq.h"
 #include "hw/ptimer.h"
 #include "hw/qdev-properties.h"
+#include "sysemu/block-backend.h"
+#include "sysemu/blockdev.h"
 
-#define R_STATUS      9
-#define R_CONTROL     10
-#define R_PERIODL     11
-#define R_PERIODH     12
-#define R_SNAPL       13
-#define R_SNAPH       14
+#define R_STATUS      11
+#define R_CONTROL     12
+#define R_PERIODL     13
+#define R_PERIODH     14
+#define R_SNAPL       15
+#define R_SNAPH       16
 
 // FFFFFFC0		Millisecond Counter
 // FFFFFFC4             Switches / LED
@@ -48,7 +50,7 @@
 // FFFFFFD4             SPI Status / SPI Control
 // FFFFFFD8             Mouse Input
 // FFFFFFDC             Keyboard Input
-// FFFFFFE0             
+// FFFFFFE0             DEBUG 
 // FFFFFFE4             
 // FFFFFFE8             Clipboard A
 // FFFFFFEC             Clipboard B
@@ -61,8 +63,12 @@
 #define R_SPICONTROL	5
 #define R_MOUSE		6
 #define R_KEYBOARD	7
+#define R_DEBUG         8
+#define R_DEBUG2        9
+#define R_DEBUG3        10
 
-#define R_MAX         15
+
+#define R_MAX         17
 
 #define STATUS_TO     0x0001
 #define STATUS_RUN    0x0002
@@ -89,11 +95,15 @@ typedef struct RISC6Timer {
     uint32_t      spi_sel;
     uint32_t      freq_hz;
     ptimer_state *ptimer;
+    BlockBackend *blk;
+    uint8_t      *buf;
     uint32_t      regs[R_MAX];
 
     uint32_t      disk_state;
     FILE *        disk_file;
     uint32_t      disk_offset;
+    unsigned int  disk_index;
+    unsigned int  disk_size;
 
     uint32_t      rx_buf[128];
     int           rx_idx;
@@ -101,6 +111,8 @@ typedef struct RISC6Timer {
     uint32_t      tx_buf[130];
     int           tx_cnt;
     int           tx_idx;
+
+    int           debugcount;
 
 } RISC6Timer;
 
@@ -111,11 +123,75 @@ static int timer_irq_state(RISC6Timer *t)
     return irq;
 }
 
+static void read_sector(RISC6Timer *t){
+//  printf("Read Sector\n");
+  uint8_t abuf[1024];
+  uint32_t * r;
+
+//  printf("index is %d byte offset is %d\n",t->disk_index,t->disk_index*512);
+
+  int alen = blk_pread(t->blk, (t->disk_index)*512, abuf, 512);
+
+  if (alen != 512) {
+    printf("Disk Read Error\n");
+  }
+
+  r = (uint32_t *) &abuf;
+  int i;
+  for (i = 0; i < 128; i++) {
+//    printf("%08x\n",*r);
+    r = (uint32_t *) &(abuf[i*4]);
+    t->tx_buf[i+2] = *r;
+    r++;
+//    t->tx_buf[i+2] = abuf[i*4+0] | (abuf[i*4+1] << 8) | (abuf[i*4+2] << 16) | (abuf[i*4+3] << 24);  
+  }
+
+}
+
+static void write_sector(RISC6Timer *t){
+  printf("Write Sector\n");
+}
+
+static void disk_run_command(RISC6Timer *t){
+  uint32_t cmd = t->rx_buf[0];
+  uint32_t arg = ((t->rx_buf[1] & 0xFF) << 24) | ((t->rx_buf[2] & 0xFF) << 16) | ((t->rx_buf[3] & 0xFF) << 8) | (t->rx_buf[4] & 0xFF);
+
+  switch (cmd) {
+    case 81: 
+      t->disk_state = diskRead;
+      t->tx_buf[0] = 0;
+      t->tx_buf[1] = 254;
+      printf("Seek %8u for read\n",arg);
+      t->disk_index = ((arg -  524290 ));//(unsigned int)t->disk_offset) );// * 512;
+//      printf("Sector index %8u for read\n",t->disk_index);
+      read_sector(t);
+      t->tx_cnt = 2 + 128;
+      break;
+    case 88: 
+      t->disk_state = diskWrite;
+      printf("Seek %8u for write\n",arg);
+      t->disk_index = ((arg -  524290));//(unsigned int)t->disk_offset) );// * 512;
+//      printf("Sector index %8u for write\n",t->disk_index);
+      t->tx_buf[0] = 0;
+      t->tx_cnt = 1;
+      break;
+    default: 
+      t->tx_buf[0] = 0;
+      t->tx_cnt = 1;
+      
+  }
+  t->tx_idx = -1;
+}
+
 
 static uint32_t spi_read(RISC6Timer *t){
-    uint32_t r = 0xFF;
-    if (t->spi_sel == 1 && t->tx_idx >= 0 && t->tx_idx < t->tx_cnt) {
-      r = t->tx_buf[t->tx_idx];
+    uint32_t r;
+
+    r = 255;
+    if (t->spi_sel == 1){
+      if ( t->tx_idx >= 0 && t->tx_idx < t->tx_cnt) {
+        r = t->tx_buf[t->tx_idx];
+      }
     }
     return r;
 }
@@ -126,43 +202,46 @@ static void spi_write(RISC6Timer *t, uint32_t value){
 
       switch (t->disk_state) {
       case diskCommand: 
-//        if (uint8(value) != 0xFF || board.Disk.rx_idx != 0) {
-//          board.Disk.rx_buf[board.Disk.rx_idx] = value
-//          board.Disk.rx_idx++
-//          if (board.Disk.rx_idx == 6) {
-//           board.disk_run_command()
-//            board.Disk.rx_idx = 0
-//          }
-//        }
+        if ((uint8_t)value != 0xFF || t->rx_idx != 0) {
+          t->rx_buf[t->rx_idx] = value;
+          t->rx_idx++;
+          if (t->rx_idx == 6) {
+//            if (t->rx_buf[0]|t->rx_buf[1]|t->rx_buf[2]|t->rx_buf[3]|t->rx_buf[4]|t->rx_buf[5]) {
+//              printf(" %d %d %d %d %d %d\n",t->rx_buf[0],t->rx_buf[1],t->rx_buf[2],t->rx_buf[3],t->rx_buf[4],t->rx_buf[5]);
+//            }
+            disk_run_command(t);
+            t->rx_idx = 0;
+          }
+        }
         break;  
       case diskRead: 
-//        if (board.Disk.tx_idx == board.Disk.tx_cnt) {
-//          board.Disk.state = diskCommand;
-//          board.Disk.tx_cnt = 0;
-//          board.Disk.tx_idx = 0;
-//        }
+        if (t->tx_idx == t->tx_cnt) {
+          t->disk_state = diskCommand;
+          t->tx_cnt = 0;
+          t->tx_idx = 0;
+        }
         break;
       case diskWrite: 
-//        if (value == 254) {
-//          board.Disk.state = diskWriting;
-//        }
+        if (value == 254) {
+          t->disk_state = diskWriting;
+        }
         break;
       case diskWriting: 
-//        if (board.Disk.rx_idx < 128) {
-//          board.Disk.rx_buf[board.Disk.rx_idx] = value;
-//        }
-//        board.Disk.rx_idx++;
-//        if (board.Disk.rx_idx == 128) {
-//       //        write_sector(disk.file, &disk.rx_buf[0]);
-//          board.write_sector()
-//        }
-//        if (board.Disk.rx_idx == 130) {
-//          board.Disk.tx_buf[0] = 5;
-//          board.Disk.tx_cnt = 1;
-//          board.Disk.tx_idx = -1;
-//          board.Disk.rx_idx = 0;
-//          board.Disk.state = diskCommand;
-//        }
+        if (t->rx_idx < 128) {
+          t->rx_buf[t->rx_idx] = value;
+        }
+        t->rx_idx++;
+        if (t->rx_idx == 128) {
+       //        write_sector(disk.file, &disk.rx_buf[0]);
+          write_sector(t);
+        }
+        if (t->rx_idx == 130) {
+          t->tx_buf[0] = 5;
+          t->tx_cnt = 1;
+          t->tx_idx = -1;
+          t->rx_idx = 0;
+          t->disk_state = diskCommand;
+        }
         break;
       }
 
@@ -186,12 +265,12 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
         break;
     case R_SPIDATA:
 	r = spi_read(t);
-        printf("SPI dr %lx\n",r);
+//        printf("SPI D< %lx\n",r);
 	break;
 
     case R_SPICONTROL:
         r = 1;
-        printf("SPI cr %lx\n",r);
+//        printf("SPI C< %lx\n",r);
         break;
 
     default:
@@ -215,14 +294,37 @@ static void timer_write(void *opaque, hwaddr addr,
     addr >>= 2;
 
     switch (addr) {
+    case R_LED:
+        printf("LED:%ld\n",value);
+        break;
+
     case R_SPIDATA:
         spi_write(t,value);
-        printf("SPI dw %lx\n",value);
+//        printf("SPI D> %lx\n",value);
         break;
 
     case R_SPICONTROL:
-        printf("SPI cw %ld\n",value & 3);
+//        printf("SPI C> %ld\n",value & 3);
         t->spi_sel = value & 3;
+        break;
+
+    case R_DEBUG:
+//        if((t->debugcount > 10000)&&(t->debugcount < 50000)){
+//          printf("\nDEBUG:%08x:%08lx ",t->debugcount,value);
+//        }
+//        t->debugcount++;
+        break;
+
+    case R_DEBUG2:
+//        if((t->debugcount < 10000)&&(t->debugcount < 50000)){
+//          printf("%lx ",value);
+//        }
+        break;
+
+    case R_DEBUG3:
+//        if((t->debugcount < 10000)&&(t->debugcount < 50000)){
+//          printf("%08lx ",value);
+//        }
         break;
 
     case R_STATUS:
@@ -325,10 +427,50 @@ static void risc6_timer_realize(DeviceState *dev, Error **errp)
 
 static void risc6_timer_init(Object *obj)
 {
+    DriveInfo *dinfo;
+    int64_t size;
+
+
     RISC6Timer *t = RISC6_TIMER(obj);
     SysBusDevice *sbd = SYS_BUS_DEVICE(obj);
 
     sysbus_init_irq(sbd, &t->irq);
+
+    dinfo = drive_get(IF_NONE, 0, 0);
+    if (dinfo) {
+       t->blk = blk_by_legacy_dinfo(dinfo);
+       printf("Have dinfo\n");
+       size = blk_getlength(t->blk);
+       t->disk_size=0;
+       if (size <= 0) {
+           printf("failed to get disk size\n");
+       }else{
+           printf("disk size: %ld bytes\n",size);
+           t->disk_size=size;
+       }
+
+       t->buf = g_malloc0(512);
+
+       int alen = blk_pread(t->blk, 0, t->buf, 512);
+
+       t->disk_index = 0;
+       t->disk_offset = 0;
+
+       if (alen != 512) {
+            printf("Couldn't read disk block zero\n");
+       }else{
+            printf("Read disk block zero success, signature %d %d %d %d\n",t->buf[0],t->buf[1],t->buf[2],t->buf[3]);
+            if (t->buf[0]==141 && t->buf[1]==163 && t->buf[2]==30 && t->buf[3]==155){
+               t->disk_offset = 0x80002; // 524290
+            }
+
+       }
+
+
+    }else{
+      printf("N. dinfo for drive.\n");
+    }
+
 }
 
 static void risc6_timer_reset(DeviceState *dev)
@@ -348,6 +490,7 @@ static void risc6_timer_reset(DeviceState *dev)
     t->tx_cnt = 0;
     t->tx_idx = 0;
 
+    t->debugcount = 0;
 }
 
 static Property risc6_timer_properties[] = {
