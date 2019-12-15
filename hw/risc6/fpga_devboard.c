@@ -43,6 +43,7 @@
 
 #define ROM_FILE    "risc-boot.bin"
 
+/*
 static void cg3_init(hwaddr addr, int vram_size, int width, int height, int depth)
 {
     DeviceState *dev;
@@ -59,16 +60,17 @@ static void cg3_init(hwaddr addr, int vram_size, int width, int height, int dept
 
 
 
-//    /* FCode ROM */
+//    
     sysbus_mmio_map(s, 0, addr);
-//    /* DAC */
+//    
     sysbus_mmio_map(s, 1, addr + 0x400000ULL);
-//    /* 8-bit plane */
+//    
     sysbus_mmio_map(s, 2, addr + 0x800000ULL);
 
 
 
 }
+*/
 
 static void risc6_fpga_risc_init(MachineState *machine)
 {
@@ -81,7 +83,7 @@ static void risc6_fpga_risc_init(MachineState *machine)
     MemoryRegion *phys_ram = g_new(MemoryRegion, 1);
 
 /*    MemoryRegion *phys_ram_alias = g_new(MemoryRegion, 1); */
-    ram_addr_t rom_base = 0xFFFFE000;
+    ram_addr_t rom_base = 0xFFFFF800;
     ram_addr_t rom_size = 0x2000;    
     ram_addr_t ram_base = 0x00000000;
     ram_addr_t ram_size = 0x04000000;
@@ -129,7 +131,7 @@ static void risc6_fpga_risc_init(MachineState *machine)
 
     /* Register: fpga io  */
     dev = qdev_create(NULL, "RISC6,io");
-    qdev_prop_set_uint32(dev, "clock-frequency", 75 * 1000000);
+    qdev_prop_set_uint32(dev, "clock-frequency", 750 * 1000000);
     qdev_init_nofail(dev);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, 0xFFFFFFC0);
     sysbus_connect_irq(SYS_BUS_DEVICE(dev), 0, irq[0]);
@@ -141,12 +143,12 @@ static void risc6_fpga_risc_init(MachineState *machine)
 //    sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, 0xe0000880);
 //    sysbus_connect_irq(SYS_BUS_DEVICE(dev), 0, irq[5]);
 
-    cg3_init( 0xEFFFF800, 0x00100000, graphic_width, graphic_height, graphic_depth);
+//    cg3_init( 0x10000000, 0x00100000, graphic_width, graphic_height, graphic_depth);
 
     /* Configure new exception vectors and reset CPU for it to take effect. */
-    cpu->reset_addr     = 0xFFFFE000;
-    cpu->exception_addr = 0xFFFFE000;
-    cpu->fast_tlb_miss_addr = 0xFFFFE000;
+    cpu->reset_addr     = 0xFFFFF800;
+    cpu->exception_addr = 0xFFFFF800;
+    cpu->fast_tlb_miss_addr = 0xFFFFF800;
 
     risc6_board_reset(cpu, ram_base, rom_base, ram_size, machine->initrd_filename,
                       ROM_FILE, NULL);
@@ -179,8 +181,7 @@ static void risc6_fpga_risc_machine_init(struct MachineClass *mc)
 
 
             /* sbus irq 5 */
-            cg3_init( 0xFFFFF800, 0x00100000,
-                     graphic_width, graphic_height, graphic_depth);
+//            cg3_init( 0xFFFFF800, 0x00100000, graphic_width, graphic_height, graphic_depth);
 
 
         }

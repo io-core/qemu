@@ -68,12 +68,12 @@ static void main_cpu_reset(void *opaque)
 
     printf("Reset, pc=0x%08x\n",env->regs[R_PC]);
 
-    env->regs[0] =  RISC6_MAGIC; 
-    env->regs[R_PC] =  0xffffe000;
+    env->regs[0] =  0; //RISC6_MAGIC; 
+    env->regs[R_PC] =  0xfffff800;
 
-    env->regs[1] = 0x12345678;      //boot_info.initrd_start;
-    env->regs[2] = 0x23456789;      //boot_info.fdt;
-    env->regs[3] = 0x3456789a;      //boot_info.cmdline;
+    env->regs[1] = 0; //0x12345678;      //boot_info.initrd_start;
+    env->regs[2] = 0; //0x23456789;      //boot_info.fdt;
+    env->regs[3] = 0; //0x3456789a;      //boot_info.cmdline;
 
 //    cpu_set_pc(cs, boot_info.bootstrap_pc);
 //    if (boot_info.machine_cpu_reset) {

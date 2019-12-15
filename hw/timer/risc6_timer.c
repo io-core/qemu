@@ -28,7 +28,9 @@
 #include "qemu/module.h"
 #include "qapi/error.h"
 
+#include "ui/console.h"
 #include "hw/sysbus.h"
+#include "migration/vmstate.h"
 #include "hw/irq.h"
 #include "hw/ptimer.h"
 #include "hw/qdev-properties.h"
@@ -78,6 +80,9 @@
 #define CONTROL_START 0x0004
 #define CONTROL_STOP  0x0008
 
+#define CG3_VRAM_SIZE 0x100000
+
+
 #define TYPE_RISC6_TIMER "RISC6,io"
 #define RISC6_TIMER(obj) \
     OBJECT_CHECK(RISC6Timer, (obj), TYPE_RISC6_TIMER)
@@ -90,7 +95,12 @@
 
 typedef struct RISC6Timer {
     SysBusDevice  busdev;
+    QemuConsole  *con;
     MemoryRegion  mmio;
+    MemoryRegion  vram_mem;
+    uint32_t      vram_size;
+    int           full_update;
+    uint16_t      width, height, depth;
     qemu_irq      irq;
     uint32_t      spi_sel;
     uint32_t      freq_hz;
@@ -116,6 +126,91 @@ typedef struct RISC6Timer {
 
 } RISC6Timer;
 
+static void fpga_update_display(void *opaque)
+{
+    RISC6Timer *s = opaque;
+    DisplaySurface *surface = qemu_console_surface(s->con);
+    const uint8_t *pix;
+    uint32_t *data;
+    uint32_t dval;
+    int x, y, y_start;
+    unsigned int width, height;
+    ram_addr_t page;
+    DirtyBitmapSnapshot *snap = NULL;
+
+//    printf("CG3 update display\n");
+
+    if (surface_bits_per_pixel(surface) != 32) {
+        return;
+    }
+    width = s->width;
+    height = s->height;
+
+    y_start = -1;
+    pix = memory_region_get_ram_ptr(&s->vram_mem);
+    data = (uint32_t *)surface_data(surface);
+
+    if (!s->full_update) {
+        snap = memory_region_snapshot_and_clear_dirty(&s->vram_mem, 0x0,
+                                              memory_region_size(&s->vram_mem),
+                                              DIRTY_MEMORY_VGA);
+    }
+    for (y = 0; y < height; y++) {
+        int update;
+
+        page = (ram_addr_t)y * width;
+
+        if (s->full_update) {
+            update = 1;
+        } else {
+            update = memory_region_snapshot_get_dirty(&s->vram_mem, snap, page,
+                                                      width);
+        }
+
+        if (update) {
+            if (y_start < 0) {
+                y_start = y;
+            }
+
+            for (x = 0; x < width; x++) {
+                dval = *pix++;
+                // dval = (s->r[dval] << 16) | (s->g[dval] << 8) | s->b[dval];
+                *data++ = dval;
+            }
+        } else {
+            if (y_start >= 0) {
+                dpy_gfx_update(s->con, 0, y_start, width, y - y_start);
+                y_start = -1;
+            }
+            pix += width;
+            data += width;
+        }
+    }
+    s->full_update = 0;
+    if (y_start >= 0) {
+        dpy_gfx_update(s->con, 0, y_start, width, y - y_start);
+    }
+    
+    g_free(snap);
+}
+
+static void fpga_invalidate_display(void *opaque)
+{
+    RISC6Timer *s = opaque;
+
+    printf("fpga invalidate display\n");
+
+    memory_region_set_dirty(&s->vram_mem, 0, CG3_VRAM_SIZE);
+}
+
+
+static const GraphicHwOps video_ops = {
+    .invalidate = fpga_invalidate_display,
+    .gfx_update = fpga_update_display,
+};
+
+
+
 static int timer_irq_state(RISC6Timer *t)
 {
     bool irq = (t->regs[R_STATUS] & STATUS_TO) &&
@@ -130,20 +225,25 @@ static void read_sector(RISC6Timer *t){
 
 //  printf("index is %d byte offset is %d\n",t->disk_index,t->disk_index*512);
 
-  int alen = blk_pread(t->blk, (t->disk_index)*512, abuf, 512);
+  if (t->disk_size < ((t->disk_index)*512)+512) {
+    printf("Disk Read Past End\n");
+  }else{
 
-  if (alen != 512) {
-    printf("Disk Read Error\n");
-  }
+    int alen = blk_pread(t->blk, (t->disk_index)*512, abuf, 512);
 
-  r = (uint32_t *) &abuf;
-  int i;
-  for (i = 0; i < 128; i++) {
-//    printf("%08x\n",*r);
-    r = (uint32_t *) &(abuf[i*4]);
-    t->tx_buf[i+2] = *r;
-    r++;
-//    t->tx_buf[i+2] = abuf[i*4+0] | (abuf[i*4+1] << 8) | (abuf[i*4+2] << 16) | (abuf[i*4+3] << 24);  
+    if (alen != 512) {
+      printf("Disk Read Error\n");
+    }
+
+    r = (uint32_t *) &abuf;
+    int i;
+    for (i = 0; i < 128; i++) {
+//      printf("%08x\n",*r);
+      r = (uint32_t *) &(abuf[i*4]);
+      t->tx_buf[i+2] = *r;
+      r++;
+//      t->tx_buf[i+2] = abuf[i*4+0] | (abuf[i*4+1] << 8) | (abuf[i*4+2] << 16) | (abuf[i*4+3] << 24);  
+    }
   }
 
 }
@@ -260,18 +360,41 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
 //    printf("RISC6 IO READ OF: %ld\n",addr);
 
     switch (addr) {
-    case R_CONTROL:
-        r = t->regs[R_CONTROL] & (CONTROL_ITO | CONTROL_CONT);
+
+
+    case R_MILLISECONDS:
+        printf("IO Read Milliseconds\n");
         break;
+    case R_LED:	      
+        printf("IO Read LED\n");
+        break;
+    case R_RS232DATA:   
+        printf("IO Read RS232Data\n");
+        break;
+    case R_RS232STATUS: 
+        printf("IO Read RS232Status\n");
+        break;
+
     case R_SPIDATA:
 	r = spi_read(t);
-//        printf("SPI D< %lx\n",r);
 	break;
 
     case R_SPICONTROL:
         r = 1;
-//        printf("SPI C< %lx\n",r);
         break;
+
+    case R_MOUSE:
+        printf("IO Read Mouse\n");
+        break;
+    case R_KEYBOARD:
+        printf("IO Read Keyboard\n");
+        break;
+
+
+    case R_CONTROL:
+        r = t->regs[R_CONTROL] & (CONTROL_ITO | CONTROL_CONT);
+        break;
+
 
     default:
         if (addr < ARRAY_SIZE(t->regs)) {
@@ -294,36 +417,51 @@ static void timer_write(void *opaque, hwaddr addr,
     addr >>= 2;
 
     switch (addr) {
+
+    case R_MILLISECONDS:
+        printf("IO Write Milliseconds\n");
+        break;
     case R_LED:
         printf("LED:%ld\n",value);
+        if(value==132){
+//          t->debugcount=0;
+        }
         break;
-
+    case R_RS232DATA:
+        printf("IO Write RS232Data\n");
+        break;    
+    case R_RS232STATUS:
+        printf("IO Write RS232Status\n");
+        break;
     case R_SPIDATA:
         spi_write(t,value);
-//        printf("SPI D> %lx\n",value);
         break;
-
     case R_SPICONTROL:
-//        printf("SPI C> %ld\n",value & 3);
         t->spi_sel = value & 3;
+        break;
+    case R_MOUSE:
+        printf("IO Write Mouse\n");
+        break;
+    case R_KEYBOARD:
+        printf("IO Write Keyboard\n");
         break;
 
     case R_DEBUG:
-//        if((t->debugcount > 10000)&&(t->debugcount < 50000)){
-//          printf("\nDEBUG:%08x:%08lx ",t->debugcount,value);
+//        if((t->debugcount < 100000)&&(t->debugcount >= 0)){
+          printf("\nDEBUG:%08x:%08lx ",t->debugcount,value);
 //        }
 //        t->debugcount++;
         break;
 
     case R_DEBUG2:
-//        if((t->debugcount < 10000)&&(t->debugcount < 50000)){
-//          printf("%lx ",value);
+//        if((t->debugcount < 100000)&&(t->debugcount >= 0)){
+          printf("%lx ",value);
 //        }
         break;
 
     case R_DEBUG3:
-//        if((t->debugcount < 10000)&&(t->debugcount < 50000)){
-//          printf("%08lx ",value);
+//        if((t->debugcount < 100000)&&(t->debugcount >= 0)){
+          printf("%08lx ",value);
 //        }
         break;
 
@@ -423,6 +561,17 @@ static void risc6_timer_realize(DeviceState *dev, Error **errp)
     memory_region_init_io(&t->mmio, OBJECT(t), &timer_ops, t,
                           TYPE_RISC6_TIMER, R_MAX * sizeof(uint32_t));
     sysbus_init_mmio(sbd, &t->mmio);
+
+    memory_region_init_ram(&t->vram_mem, NULL, "fpga.vram", t->vram_size,
+                           &error_fatal);
+    memory_region_set_log(&t->vram_mem, true, DIRTY_MEMORY_VGA);
+    sysbus_init_mmio(sbd, &t->vram_mem);
+
+//    sysbus_init_irq(sbd, &t->irq);
+
+    t->con = graphic_console_init(DEVICE(dev), 0, &video_ops, t);
+    qemu_console_resize(t->con, t->width, t->height);
+
 }
 
 static void risc6_timer_init(Object *obj)
@@ -473,6 +622,30 @@ static void risc6_timer_init(Object *obj)
 
 }
 
+static int vmstate_fpga_post_load(void *opaque, int version_id)
+{
+    RISC6Timer *t = opaque;
+
+    fpga_invalidate_display(t);
+
+    return 0;
+}
+
+static const VMStateDescription vmstate_fpga = {
+    .name = "fpga",
+    .version_id = 1,
+    .minimum_version_id = 1,
+    .post_load = vmstate_fpga_post_load,
+    .fields = (VMStateField[]) {
+        VMSTATE_UINT16(height, RISC6Timer),
+        VMSTATE_UINT16(width, RISC6Timer),
+        VMSTATE_UINT16(depth, RISC6Timer), 
+        VMSTATE_END_OF_LIST()
+    }
+};
+
+
+
 static void risc6_timer_reset(DeviceState *dev)
 {
     RISC6Timer *t = RISC6_TIMER(dev);
@@ -490,11 +663,15 @@ static void risc6_timer_reset(DeviceState *dev)
     t->tx_cnt = 0;
     t->tx_idx = 0;
 
-    t->debugcount = 0;
+    t->debugcount = -1;
 }
 
 static Property risc6_timer_properties[] = {
     DEFINE_PROP_UINT32("clock-frequency", RISC6Timer, freq_hz, 0),
+    DEFINE_PROP_UINT32("vram-size",       RISC6Timer, vram_size, -1),
+    DEFINE_PROP_UINT16("width",           RISC6Timer, width,     -1),
+    DEFINE_PROP_UINT16("height",          RISC6Timer, height,    -1),
+    DEFINE_PROP_UINT16("depth",           RISC6Timer, depth,     -1),
     DEFINE_PROP_END_OF_LIST(),
 };
 
@@ -504,6 +681,7 @@ static void risc6_timer_class_init(ObjectClass *klass, void *data)
 
     dc->realize = risc6_timer_realize;
     dc->props = risc6_timer_properties;
+    dc->vmsd = &vmstate_fpga;
     dc->reset = risc6_timer_reset;
 }
 

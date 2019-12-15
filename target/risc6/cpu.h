@@ -64,11 +64,10 @@ typedef struct RISC6CPUClass {
 #define FAST_TLB_MISS_ADDRESS 0xffffe000
 
 
-/* was GP regs + CR regs + PC */
+
 
 /* r0-r9, ra, rb, mt, sb, sp ,lr , rc, rv, rn, rz, rh, xc, pc */
-#define NUM_CORE_REGS (16+7) 
-/* was (32 + 32 + 1) */
+#define NUM_CORE_REGS 23 
 
 /* General purpose register aliases */
 
@@ -88,6 +87,13 @@ typedef struct RISC6CPUClass {
 #define R_SB     13
 #define R_SP     14
 #define R_LR     15
+#define R_C          16
+#define R_V          17
+#define R_N          18
+#define R_Z          19
+#define R_H          20
+#define R_XC         21
+#define R_PC         22
 
 
 
@@ -110,15 +116,6 @@ typedef struct RISC6CPUClass {
 
 
 
-/* Other registers */
-
-#define R_C          16
-#define R_V          17
-#define R_N          18
-#define R_Z          19
-#define R_H          20
-#define R_XC         21
-#define R_PC         22
 
 /* Exceptions */
 
@@ -148,6 +145,9 @@ typedef struct RISC6CPUClass {
 
 struct CPURISC6State {
     uint32_t regs[NUM_CORE_REGS];
+    uint32_t pc;                /* program counter */
+    uint32_t sr_t;              /* T bit of status register */
+    uint32_t flags;             /* general execution flags */
 
     RISC6MMU mmu;
 
