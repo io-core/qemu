@@ -420,7 +420,7 @@ static void memop_decode_opc(DisasContext * ctx){
       tcg_gen_mov_tl(cval, addr );
       tcg_gen_subi_tl(cval, cval, 0xe7f00 );
       tcg_gen_shli_tl(cval, cval, 3);
-      tcg_gen_addi_tl(cval, cval, 0x10800000 );
+      tcg_gen_addi_tl(cval, cval, 0x04000000 );
       tcg_gen_qemu_st32(t_31, cval, ctx->memidx);
       tcg_gen_addi_tl(cval, cval, 4 );
       tcg_gen_qemu_st32(t_31, cval, ctx->memidx);

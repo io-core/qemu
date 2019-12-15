@@ -87,6 +87,8 @@ static void risc6_fpga_risc_init(MachineState *machine)
     ram_addr_t rom_size = 0x2000;    
     ram_addr_t ram_base = 0x00000000;
     ram_addr_t ram_size = 0x04000000;
+    ram_addr_t vram_base = 0x04000000;
+    ram_addr_t vram_size = 0x00100000;
     qemu_irq *cpu_irq, irq[32];
     int i;
 
@@ -132,8 +134,15 @@ static void risc6_fpga_risc_init(MachineState *machine)
     /* Register: fpga io  */
     dev = qdev_create(NULL, "RISC6,io");
     qdev_prop_set_uint32(dev, "clock-frequency", 750 * 1000000);
+    qdev_prop_set_uint32(dev, "vram-size", vram_size);
+    qdev_prop_set_uint16(dev, "width", graphic_width);
+    qdev_prop_set_uint16(dev, "height", graphic_height);
+    qdev_prop_set_uint16(dev, "depth", graphic_depth);
+
+
     qdev_init_nofail(dev);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, 0xFFFFFFC0);
+    sysbus_mmio_map(SYS_BUS_DEVICE(dev), 1, vram_base );
     sysbus_connect_irq(SYS_BUS_DEVICE(dev), 0, irq[0]);
 
 //    /* Register: Timer sys_clk_timer_1  */
