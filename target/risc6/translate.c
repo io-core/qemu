@@ -228,7 +228,7 @@ static void gen_delayed_conditional_jump(DisasContext * ctx)
 */
 
 #define IMM16 (ctx->opcode & 0xffff)
-#define IMM20 (ctx->opcode & 0xfffff)
+#define IMM20s (ctx->opcode & 0x80000 ? 0xfff00000 | (ctx->opcode & 0xfffff) : (ctx->opcode & 0xfffff))
 #define IMM24 (ctx->opcode & 0xffffff)
 #define IMM24s (ctx->opcode & 0x800000 ? 0xff000000 | (ctx->opcode & 0xffffff) :  (ctx->opcode & 0xffffff))
 #define OPCODE ((ctx->opcode >>16) & 0xf)
@@ -386,15 +386,9 @@ static void regop_decode_opc(DisasContext * ctx){
 static void memop_decode_opc(DisasContext * ctx){
     TCGv addr = tcg_temp_new_i32();
 
-    TCGv cval;
-    TCGv t_31;
-    TCGLabel *l1 = gen_new_label();
-
-
-
     tcg_gen_addi_tl(cpu_R[R_PC], cpu_R[R_PC], 4);
 
-    tcg_gen_addi_tl(addr, cpu_R[REGB], IMM20); // no negative offsets apparently
+    tcg_gen_addi_tl(addr, cpu_R[REGB], IMM20s); 
   
 
     switch((ctx->opcode >> 28) & 3){
@@ -410,39 +404,6 @@ static void memop_decode_opc(DisasContext * ctx){
       break;
     case STR:
       tcg_gen_qemu_st32(cpu_R[REGA], addr, ctx->memidx);
-
-
-      tcg_gen_brcondi_i32(TCG_COND_LT, addr, 0xe7f00, l1);
-
-
-      cval = tcg_temp_new_i32();
-      t_31 = tcg_const_tl( 0x88888888 );
-      tcg_gen_mov_tl(cval, addr );
-      tcg_gen_subi_tl(cval, cval, 0xe7f00 );
-      tcg_gen_shli_tl(cval, cval, 3);
-      tcg_gen_addi_tl(cval, cval, 0x04000000 );
-      tcg_gen_qemu_st32(t_31, cval, ctx->memidx);
-      tcg_gen_addi_tl(cval, cval, 4 );
-      tcg_gen_qemu_st32(t_31, cval, ctx->memidx);
-      tcg_gen_addi_tl(cval, cval, 4 );
-      tcg_gen_qemu_st32(t_31, cval, ctx->memidx);
-      tcg_gen_addi_tl(cval, cval, 4 );
-      tcg_gen_qemu_st32(t_31, cval, ctx->memidx);
-      tcg_gen_addi_tl(cval, cval, 4 );
-      tcg_gen_qemu_st32(t_31, cval, ctx->memidx);
-      tcg_gen_addi_tl(cval, cval, 4 );
-      tcg_gen_qemu_st32(t_31, cval, ctx->memidx);
-      tcg_gen_addi_tl(cval, cval, 4 );
-      tcg_gen_qemu_st32(t_31, cval, ctx->memidx);
-      tcg_gen_addi_tl(cval, cval, 4 );
-      tcg_gen_qemu_st32(t_31, cval, ctx->memidx);
-
-
-
-      tcg_temp_free(t_31);
-      tcg_temp_free(cval);
-
-      gen_set_label(l1);
 
       break;
     case STB:
@@ -619,9 +580,9 @@ static void risc6_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
      tcg_temp_free(t_31);
     tcg_temp_free(cval);
     }
+
+
 */
-
-
 
 
 

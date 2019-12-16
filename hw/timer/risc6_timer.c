@@ -37,6 +37,8 @@
 #include "sysemu/block-backend.h"
 #include "sysemu/blockdev.h"
 
+#define BGCOLOR		(238 << 16) + (223 << 8) + 204
+
 #define R_STATUS      11
 #define R_CONTROL     12
 #define R_PERIODL     13
@@ -80,7 +82,7 @@
 #define CONTROL_START 0x0004
 #define CONTROL_STOP  0x0008
 
-#define CG3_VRAM_SIZE 0x100000
+#define FPGA_VRAM_SIZE 0x100000
 
 
 #define TYPE_RISC6_TIMER "RISC6,io"
@@ -133,12 +135,12 @@ static void fpga_update_display(void *opaque)
     const uint8_t *pix;
     uint32_t *data;
     uint32_t dval;
-    int x, y, y_start;
+    int b, x, y, y_start;
     unsigned int width, height;
     ram_addr_t page;
     DirtyBitmapSnapshot *snap = NULL;
 
-//    printf("CG3 update display\n");
+//    printf("fpga update display\n");
 
     if (surface_bits_per_pixel(surface) != 32) {
         return;
@@ -172,17 +174,19 @@ static void fpga_update_display(void *opaque)
                 y_start = y;
             }
 
-            for (x = 0; x < width; x++) {
+            for (x = 0; x < width/8; x++) {
                 dval = *pix++;
-                // dval = (s->r[dval] << 16) | (s->g[dval] << 8) | s->b[dval];
-                *data++ = dval;
+                for (b = 0; b < 8; b++) {
+                  // dval = (s->r[dval] << 16) | (s->g[dval] << 8) | s->b[dval];
+                  *data++ = (((dval >> b ) & 1 ) == 1 ) ? 0 : BGCOLOR ;
+                }
             }
         } else {
             if (y_start >= 0) {
                 dpy_gfx_update(s->con, 0, y_start, width, y - y_start);
                 y_start = -1;
             }
-            pix += width;
+            pix += width/8;
             data += width;
         }
     }
@@ -200,7 +204,7 @@ static void fpga_invalidate_display(void *opaque)
 
     printf("fpga invalidate display\n");
 
-    memory_region_set_dirty(&s->vram_mem, 0, CG3_VRAM_SIZE);
+    memory_region_set_dirty(&s->vram_mem, 0, FPGA_VRAM_SIZE);
 }
 
 
@@ -424,7 +428,7 @@ static void timer_write(void *opaque, hwaddr addr,
     case R_LED:
         printf("LED:%ld\n",value);
         if(value==132){
-//          t->debugcount=0;
+          t->debugcount=0;
         }
         break;
     case R_RS232DATA:
@@ -447,22 +451,22 @@ static void timer_write(void *opaque, hwaddr addr,
         break;
 
     case R_DEBUG:
-//        if((t->debugcount < 100000)&&(t->debugcount >= 0)){
+        if((t->debugcount < 10000000)&&(t->debugcount >= 0)){
           printf("\nDEBUG:%08x:%08lx ",t->debugcount,value);
-//        }
-//        t->debugcount++;
+        }
+        t->debugcount++;
         break;
 
     case R_DEBUG2:
-//        if((t->debugcount < 100000)&&(t->debugcount >= 0)){
+        if((t->debugcount < 10000000)&&(t->debugcount >= 0)){
           printf("%lx ",value);
-//        }
+        }
         break;
 
     case R_DEBUG3:
-//        if((t->debugcount < 100000)&&(t->debugcount >= 0)){
+        if((t->debugcount < 10000000)&&(t->debugcount >= 0)){
           printf("%08lx ",value);
-//        }
+        }
         break;
 
     case R_STATUS:
