@@ -29,6 +29,7 @@
 #include "qapi/error.h"
 
 #include "ui/console.h"
+#include "ui/input.h"
 #include "hw/sysbus.h"
 #include "migration/vmstate.h"
 #include "hw/irq.h"
@@ -36,6 +37,7 @@
 #include "hw/qdev-properties.h"
 #include "sysemu/block-backend.h"
 #include "sysemu/blockdev.h"
+
 
 #define BGCOLOR		(238 << 16) + (223 << 8) + 204
 
@@ -74,6 +76,18 @@
 
 #define R_MAX         17
 
+
+#define PS2_MOUSE_BUTTON_LEFT   0x01
+#define PS2_MOUSE_BUTTON_RIGHT  0x02
+#define PS2_MOUSE_BUTTON_MIDDLE 0x04
+#define PS2_MOUSE_BUTTON_SIDE   0x08
+#define PS2_MOUSE_BUTTON_EXTRA  0x10
+
+#define MOUSE_STATUS_REMOTE     0x40
+#define MOUSE_STATUS_ENABLED    0x20
+#define MOUSE_STATUS_SCALE21    0x10
+
+
 #define STATUS_TO     0x0001
 #define STATUS_RUN    0x0002
 
@@ -98,6 +112,10 @@
 typedef struct RISC6Timer {
     SysBusDevice  busdev;
     QemuConsole  *con;
+    void         *kbd;
+    void         *mouse;
+    int           mouse_oldx;
+    int           mouse_oldy;
     MemoryRegion  mmio;
     MemoryRegion  vram_mem;
     uint32_t      vram_size;
@@ -127,6 +145,50 @@ typedef struct RISC6Timer {
     int           debugcount;
 
 } RISC6Timer;
+
+
+
+typedef struct {
+    // Keep the data array 256 bytes long, which compatibility
+    //  with older qemu versions. 
+    uint8_t data[256];
+    int rptr, wptr, count;
+} PS2Queue;
+
+typedef struct PS2State {
+    PS2Queue queue;
+    int32_t write_cmd;
+    void (*update_irq)(void *, int);
+    void *update_arg;
+} PS2State;
+
+typedef struct {
+    PS2State common;
+    int scan_enabled;
+    int translate;
+    int scancode_set; // 1=XT, 2=AT, 3=PS/2 
+    int ledstate;
+    bool need_high_bit;
+    unsigned int modifiers; // bitmask of MOD_* constants above 
+} PS2KbdState;
+
+typedef struct {
+    PS2State common;
+    uint8_t mouse_status;
+    uint8_t mouse_resolution;
+    uint8_t mouse_sample_rate;
+    uint8_t mouse_wrap;
+    uint8_t mouse_type; // 0 = PS2, 3 = IMPS/2, 4 = IMEX 
+    uint8_t mouse_detect_state;
+    int mouse_dx; // current values, needed for 'poll' mode 
+    int mouse_dy;
+    int mouse_dz;
+    int mouse_ox;
+    int mouse_oy;
+    bool mousefixed;
+    uint8_t mouse_buttons;
+} PS2MouseState;
+
 
 static void fpga_update_display(void *opaque)
 {
@@ -160,7 +222,7 @@ static void fpga_update_display(void *opaque)
     for (y = 0; y < height; y++) {
         int update;
 
-        page = (ram_addr_t)y * width;
+        page = (ram_addr_t)y * width/8;
 
         if (s->full_update) {
             update = 1;
@@ -177,8 +239,8 @@ static void fpga_update_display(void *opaque)
             for (x = 0; x < width/8; x++) {
                 dval = *pix++;
                 for (b = 0; b < 8; b++) {
-                  // dval = (s->r[dval] << 16) | (s->g[dval] << 8) | s->b[dval];
-                  *data++ = (((dval >> b ) & 1 ) == 1 ) ? 0 : BGCOLOR ;
+                  data[((height-y)*width)+(x*8)+b] = (((dval >> b ) & 1 ) == 1 ) ? 0 : BGCOLOR ; 
+               //   *data++ = (((dval >> b ) & 1 ) == 1 ) ? 0 : BGCOLOR ;
                 }
             }
         } else {
@@ -233,11 +295,15 @@ static void read_sector(RISC6Timer *t){
     printf("Disk Read Past End\n");
   }else{
 
+//    sleep(.02);
+
     int alen = blk_pread(t->blk, (t->disk_index)*512, abuf, 512);
 
     if (alen != 512) {
       printf("Disk Read Error\n");
     }
+
+//    sleep(.02);
 
     r = (uint32_t *) &abuf;
     int i;
@@ -357,6 +423,8 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
                            unsigned int size)
 {
     RISC6Timer *t = opaque;
+    PS2MouseState *s;
+
     uint64_t r = 0;
 
     addr >>= 2;
@@ -367,7 +435,7 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
 
 
     case R_MILLISECONDS:
-        printf("IO Read Milliseconds\n");
+//        printf("IO Read Milliseconds\n");
         break;
     case R_LED:	      
         printf("IO Read LED\n");
@@ -388,10 +456,15 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
         break;
 
     case R_MOUSE:
-        printf("IO Read Mouse\n");
+        s = (PS2MouseState *)t->mouse;
+        if (t->mouse_oldx != s->mouse_dx || t->mouse_oldy != s->mouse_dy){
+          t->mouse_oldx = s->mouse_dx;
+          t->mouse_oldy = s->mouse_dy;
+          printf("IO Read Mouse %d %d\n",t->mouse_oldx,t->mouse_oldy);
+        }
         break;
     case R_KEYBOARD:
-        printf("IO Read Keyboard\n");
+//        printf("IO Read Keyboard\n");
         break;
 
 
@@ -547,6 +620,280 @@ static void timer_hit(void *opaque)
     qemu_set_irq(t->irq, timer_irq_state(t));
 }
 
+
+
+static void ps2_keyboard_event(DeviceState *dev, QemuConsole *src,
+                               InputEvent *evt)
+{
+    printf("Key Event!\n");
+}
+
+static void ps2_mouse_event(DeviceState *dev, QemuConsole *src,
+                            InputEvent *evt)
+{
+//    printf("Mouse Event!\n");
+
+/*
+    static const int bmap[INPUT_BUTTON__MAX] = {
+        [INPUT_BUTTON_LEFT]   = PS2_MOUSE_BUTTON_LEFT,
+        [INPUT_BUTTON_MIDDLE] = PS2_MOUSE_BUTTON_MIDDLE,
+        [INPUT_BUTTON_RIGHT]  = PS2_MOUSE_BUTTON_RIGHT,
+        [INPUT_BUTTON_SIDE]   = PS2_MOUSE_BUTTON_SIDE,
+        [INPUT_BUTTON_EXTRA]  = PS2_MOUSE_BUTTON_EXTRA,
+    };
+*/
+    PS2MouseState *s = (PS2MouseState *)dev;
+
+    InputMoveEvent *move;
+
+    InputBtnEvent *btn;
+
+    // check if deltas are recorded when disabled 
+//    if (!(s->mouse_status & MOUSE_STATUS_ENABLED))
+//        return;
+
+
+
+    switch (evt->type) {
+    case INPUT_EVENT_KIND_REL:
+
+        move = evt->u.abs.data;
+        if (move->axis == INPUT_AXIS_X) {
+            s->mouse_dx += move->value;
+        } else if (move->axis == INPUT_AXIS_Y) {
+            s->mouse_dy -= move->value;
+        }
+        if (s->mouse_dx > 1023){s->mouse_dx=1023;}
+        if (s->mouse_dx < 0){s->mouse_dx=0;}
+        if (s->mouse_dy < 0){s->mouse_dy=0;}
+        if (s->mouse_dy > 767){s->mouse_dy=767;}
+
+//        printf("Mouse position %d %d\n",s->mouse_dx,s->mouse_dy);
+
+        break;
+
+    case INPUT_EVENT_KIND_BTN:
+
+        btn = evt->u.btn.data;
+        if (btn->down) {
+          printf("Mouse Btn %d down\n",btn->button);
+        }else{
+          printf("Mouse Btn %d up\n",btn->button);
+        }
+/*
+        if (btn->down) {
+            s->mouse_buttons |= bmap[btn->button];
+            if (btn->button == INPUT_BUTTON_WHEEL_UP) {
+                s->mouse_dz--;
+            } else if (btn->button == INPUT_BUTTON_WHEEL_DOWN) {
+                s->mouse_dz++;
+            }
+        } else {
+            s->mouse_buttons &= ~bmap[btn->button];
+        }
+*/
+        break;
+
+    default:
+        // keep gcc happy 
+        break;
+    }
+
+}
+
+
+static void ps2_mouse_sync(DeviceState *dev)
+{
+    PS2MouseState *s = (PS2MouseState *)dev;
+
+//    printf("Mouse Sync %d %d %d !\n",s->mouse_dx,s->mouse_dy,s->mouse_dz);
+
+
+//    /* do not sync while disabled to prevent stream corruption */
+//    if (!(s->mouse_status & MOUSE_STATUS_ENABLED)) {
+//        return;
+//    }
+
+//    if (s->mouse_buttons) {
+//        qemu_system_wakeup_request(QEMU_WAKEUP_REASON_OTHER, NULL);
+//    }
+    if (!(s->mouse_status & MOUSE_STATUS_REMOTE)) {
+//        /* if not remote, send event. Multiple events are sent if
+//           too big deltas */
+//        while (ps2_mouse_send_packet(s)) {
+//            if (s->mouse_dx == 0 && s->mouse_dy == 0 && s->mouse_dz == 0)
+//                break;
+//        }
+//      s->mouse_dx = 0 ;
+//      s->mouse_dy = 0 ;
+    }
+}
+
+
+
+static const VMStateDescription vmstate_ps2_common = {
+    .name = "PS2 Common State",
+    .version_id = 3,
+    .minimum_version_id = 2,
+    .fields = (VMStateField[]) {
+        VMSTATE_INT32(write_cmd, PS2State),
+        VMSTATE_INT32(queue.rptr, PS2State),
+        VMSTATE_INT32(queue.wptr, PS2State),
+        VMSTATE_INT32(queue.count, PS2State),
+        VMSTATE_BUFFER(queue.data, PS2State),
+        VMSTATE_END_OF_LIST()
+    }
+};
+
+
+
+static const VMStateDescription vmstate_ps2_keyboard = {
+    .name = "ps2kbd",
+    .version_id = 3,
+    .minimum_version_id = 2,
+    .fields = (VMStateField[]) {
+        VMSTATE_STRUCT(common, PS2KbdState, 0, vmstate_ps2_common, PS2State),
+        VMSTATE_END_OF_LIST()
+    }
+};
+
+//static const VMStateDescription vmstate_ps2_keyboard = {
+//    .name = "ps2kbd",
+//    .version_id = 3,
+//    .minimum_version_id = 2,
+//    .post_load = ps2_kbd_post_load,
+//    .pre_save = ps2_kbd_pre_save,
+//    .fields = (VMStateField[]) {
+//        VMSTATE_STRUCT(common, PS2KbdState, 0, vmstate_ps2_common, PS2State),
+//        VMSTATE_INT32(scan_enabled, PS2KbdState),
+//        VMSTATE_INT32(translate, PS2KbdState),
+//        VMSTATE_INT32_V(scancode_set, PS2KbdState,3),
+//        VMSTATE_END_OF_LIST()
+//    },
+//    .subsections = (const VMStateDescription*[]) {
+//        &vmstate_ps2_keyboard_ledstate,
+//        &vmstate_ps2_keyboard_need_high_bit,
+//        NULL
+//    }
+//};
+
+
+static const VMStateDescription vmstate_ps2_mouse = {
+    .name = "ps2mouse",
+    .version_id = 2,
+    .minimum_version_id = 2,
+    .fields = (VMStateField[]) {
+        VMSTATE_STRUCT(common, PS2MouseState, 0, vmstate_ps2_common, PS2State),
+        VMSTATE_END_OF_LIST()
+    }
+};
+
+
+//static const VMStateDescription vmstate_ps2_mouse = {
+//    .name = "ps2mouse",
+//    .version_id = 2,
+//    .minimum_version_id = 2,
+//    .post_load = ps2_mouse_post_load,
+//    .pre_save = ps2_mouse_pre_save,
+//    .fields = (VMStateField[]) {
+//        VMSTATE_STRUCT(common, PS2MouseState, 0, vmstate_ps2_common, PS2State),
+//        VMSTATE_UINT8(mouse_status, PS2MouseState),
+//        VMSTATE_UINT8(mouse_resolution, PS2MouseState),
+//        VMSTATE_UINT8(mouse_sample_rate, PS2MouseState),
+//        VMSTATE_UINT8(mouse_wrap, PS2MouseState),
+//        VMSTATE_UINT8(mouse_type, PS2MouseState),
+//        VMSTATE_UINT8(mouse_detect_state, PS2MouseState),
+//        VMSTATE_INT32(mouse_dx, PS2MouseState),
+//        VMSTATE_INT32(mouse_dy, PS2MouseState),
+//        VMSTATE_INT32(mouse_dz, PS2MouseState),
+//        VMSTATE_UINT8(mouse_buttons, PS2MouseState),
+//        VMSTATE_END_OF_LIST()
+//    }
+//};
+
+
+
+
+static QemuInputHandler ps2_keyboard_handler = {
+    .name  = "QEMU PS/2 Keyboard",
+    .mask  = INPUT_EVENT_MASK_KEY,
+    .event = ps2_keyboard_event,
+};
+
+
+
+void *ps2_kbd_init(void (*update_irq)(void *, int), void *update_arg);
+
+void *ps2_kbd_init(void (*update_irq)(void *, int), void *update_arg)
+{
+    PS2KbdState *s = (PS2KbdState *)g_malloc0(sizeof(PS2KbdState));
+
+//    trace_ps2_kbd_init(s);
+//    s->common.update_irq = update_irq;
+//    s->common.update_arg = update_arg;
+    s->scancode_set = 2;
+    vmstate_register(NULL, 0, &vmstate_ps2_keyboard, s);
+    qemu_input_handler_register((DeviceState *)s,
+                                &ps2_keyboard_handler);
+//    qemu_register_reset(ps2_kbd_reset, s);
+    return s;
+}
+
+
+
+
+
+static void kbd_update_kbd_irq(void *opaque, int level)
+{
+//    KBDState *s = (KBDState *)opaque;
+
+//    if (level)
+//        s->pending |= KBD_PENDING_KBD;
+//    else
+//        s->pending &= ~KBD_PENDING_KBD;
+//    kbd_update_irq(s);
+}
+
+
+static QemuInputHandler ps2_mouse_handler = {
+    .name  = "QEMU PS/2 Mouse",
+    .mask  = INPUT_EVENT_MASK_BTN | INPUT_EVENT_MASK_REL,
+    .event = ps2_mouse_event,
+    .sync  = ps2_mouse_sync,
+};
+
+void *ps2_mouse_init(void (*update_irq)(void *, int), void *update_arg);
+void *ps2_mouse_init(void (*update_irq)(void *, int), void *update_arg)
+{
+    PS2MouseState *s = (PS2MouseState *)g_malloc0(sizeof(PS2MouseState));
+
+//    trace_ps2_mouse_init(s);
+//    s->common.update_irq = update_irq;
+//    s->common.update_arg = update_arg;
+    s->mousefixed = false;
+    s->mouse_dx = 0;
+    s->mouse_dy = 0;
+    vmstate_register(NULL, 0, &vmstate_ps2_mouse, s);
+    qemu_input_handler_register((DeviceState *)s,
+                                &ps2_mouse_handler);
+//    qemu_register_reset(ps2_mouse_reset, s);
+    return s;
+}
+
+
+
+static void kbd_update_aux_irq(void *opaque, int level)
+{
+//    KBDState *s = (KBDState *)opaque;
+
+//    if (level)
+//        s->pending |= KBD_PENDING_AUX;
+//    else
+//        s->pending &= ~KBD_PENDING_AUX;
+//    kbd_update_irq(s);
+}
+
+
 static void risc6_timer_realize(DeviceState *dev, Error **errp)
 {
     RISC6Timer *t = RISC6_TIMER(dev);
@@ -571,10 +918,18 @@ static void risc6_timer_realize(DeviceState *dev, Error **errp)
     memory_region_set_log(&t->vram_mem, true, DIRTY_MEMORY_VGA);
     sysbus_init_mmio(sbd, &t->vram_mem);
 
-//    sysbus_init_irq(sbd, &t->irq);
+    sysbus_init_irq(sbd, &t->irq);
+
+    t->mouse_oldx=0;
+    t->mouse_oldy=0;
 
     t->con = graphic_console_init(DEVICE(dev), 0, &video_ops, t);
     qemu_console_resize(t->con, t->width, t->height);
+
+    t->kbd = ps2_kbd_init( kbd_update_kbd_irq, t);
+    t->mouse = ps2_mouse_init( kbd_update_aux_irq, t);
+
+
 
 }
 
@@ -621,7 +976,7 @@ static void risc6_timer_init(Object *obj)
 
 
     }else{
-      printf("N. dinfo for drive.\n");
+      printf("No dinfo for drive.\n");
     }
 
 }
@@ -687,6 +1042,7 @@ static void risc6_timer_class_init(ObjectClass *klass, void *data)
     dc->props = risc6_timer_properties;
     dc->vmsd = &vmstate_fpga;
     dc->reset = risc6_timer_reset;
+    set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
 }
 
 static const TypeInfo risc6_timer_info = {
