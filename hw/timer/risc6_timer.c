@@ -183,26 +183,66 @@ typedef struct {
     int mouse_dx; // current values, needed for 'poll' mode 
     int mouse_dy;
     int mouse_dz;
-    int mouse_ox;
-    int mouse_oy;
-    bool mousefixed;
     uint8_t mouse_buttons;
 } PS2MouseState;
 
 
 static void fpga_update_display(void *opaque)
 {
+
     RISC6Timer *s = opaque;
     DisplaySurface *surface = qemu_console_surface(s->con);
+    unsigned int width, height;
     const uint8_t *pix;
     uint32_t *data;
+    int update;
+    ram_addr_t page;
+
+    int y, y_start, x, b;
+
+    width = s->width;
+    height = s->height;
+    data = (uint32_t *)surface_data(surface);
+    pix = memory_region_get_ram_ptr(&s->vram_mem);
+    DirtyBitmapSnapshot *snap = NULL;
+
+    
+    snap = memory_region_snapshot_and_clear_dirty(&s->vram_mem, 0x0,
+                                              memory_region_size(&s->vram_mem),
+                                              DIRTY_MEMORY_VGA);
+    
+    y_start = -1;
+
+    for (y = 0; y < height; y++) {
+      page = (ram_addr_t)y * width/8;
+      update = memory_region_snapshot_get_dirty(&s->vram_mem, snap, page, width/8);
+      if (update){
+        if (y_start < 0) {y_start = y;}
+        for (x = 0; x < width; x=x+8) {
+          for (b = 0; b < 8; b++) {
+            data[((height-1)*width-(y*width))+x+b] = (((pix[y*width/8+(x/8)] >> b ) & 1 ) == 1 ) ? 0 : BGCOLOR;
+          }
+        }
+      }
+    
+      if (y_start >=0){
+        dpy_gfx_update(s->con, 0, y_start, width, y - y_start );
+      }
+    }
+
+    g_free(snap);
+
+/*
+    const uint8_t *pix,*pixo;
+    uint32_t *data;
     uint32_t dval;
-    int b, x, y, y_start;
+    int b, x; 
+    int y, y_start;
     unsigned int width, height;
     ram_addr_t page;
     DirtyBitmapSnapshot *snap = NULL;
 
-//    printf("fpga update display\n");
+    printf("fpga update display\n");
 
     if (surface_bits_per_pixel(surface) != 32) {
         return;
@@ -212,6 +252,7 @@ static void fpga_update_display(void *opaque)
 
     y_start = -1;
     pix = memory_region_get_ram_ptr(&s->vram_mem);
+    pixo = pix;
     data = (uint32_t *)surface_data(surface);
 
     if (!s->full_update) {
@@ -237,12 +278,22 @@ static void fpga_update_display(void *opaque)
             }
 
             for (x = 0; x < width/8; x++) {
-                dval = *pix++;
-                for (b = 0; b < 8; b++) {
-                  data[((height-y)*width)+(x*8)+b] = (((dval >> b ) & 1 ) == 1 ) ? 0 : BGCOLOR ; 
+                if ((long int)pix - (long int)pixo < ((1024 * 768)/8) ){
+                  dval = *pix++;
+                  for (b = 0; b < 8; b++) {
+                    int pindex = ((height-y)*width)+(x*8)+b;
+                    if (pindex >= 0 && pindex < (1024 * 768 * 4)){
+                      data[((height-y)*width)+(x*8)+b] = (((dval >> b ) & 1 ) == 1 ) ? 0 : BGCOLOR ; 
+                    }else{
+                      printf("display buffer write overflow: %d\n",pindex);
+                    }
                //   *data++ = (((dval >> b ) & 1 ) == 1 ) ? 0 : BGCOLOR ;
+                  }
+                }else{
+		   printf("frame buffer read overflow: %ld\n",(long int)pix - (long int)pixo);
                 }
             }
+
         } else {
             if (y_start >= 0) {
                 dpy_gfx_update(s->con, 0, y_start, width, y - y_start);
@@ -258,6 +309,7 @@ static void fpga_update_display(void *opaque)
     }
     
     g_free(snap);
+*/
 }
 
 static void fpga_invalidate_display(void *opaque)
@@ -461,6 +513,17 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
           t->mouse_oldx = s->mouse_dx;
           t->mouse_oldy = s->mouse_dy;
           printf("IO Read Mouse %d %d\n",t->mouse_oldx,t->mouse_oldy);
+
+//        mx := int32(int16(xpos))
+//        my := int32(int16(ofbh-uint32(ypos)))  //768
+//	if hdpi{
+//          mx = mx * 2
+//          my = my * 2
+//	}
+//        *mptr = uint32(mbr)<<24|uint32(mbm)<<25|uint32(mbl)<<26| (uint32(my)<<12 & 0x00FFF000) | (uint32(mx) & 0x00000FFF)
+
+        r = ((t->mouse_oldy <<12) & 0x00FFF000) | (t->mouse_oldx & 0x00000FFF);
+
         }
         break;
     case R_KEYBOARD:
@@ -642,11 +705,16 @@ static void ps2_mouse_event(DeviceState *dev, QemuConsole *src,
         [INPUT_BUTTON_EXTRA]  = PS2_MOUSE_BUTTON_EXTRA,
     };
 */
+/*
     PS2MouseState *s = (PS2MouseState *)dev;
 
     InputMoveEvent *move;
 
     InputBtnEvent *btn;
+
+    DisplaySurface *surface;
+
+    int scale;
 
     // check if deltas are recorded when disabled 
 //    if (!(s->mouse_status & MOUSE_STATUS_ENABLED))
@@ -655,14 +723,34 @@ static void ps2_mouse_event(DeviceState *dev, QemuConsole *src,
 
 
     switch (evt->type) {
-    case INPUT_EVENT_KIND_REL:
+    case INPUT_EVENT_KIND_ABS:
 
         move = evt->u.abs.data;
-        if (move->axis == INPUT_AXIS_X) {
-            s->mouse_dx += move->value;
-        } else if (move->axis == INPUT_AXIS_Y) {
-            s->mouse_dy -= move->value;
-        }
+            surface = qemu_console_surface(src);
+            switch (move->axis) {
+            case INPUT_AXIS_X:
+                scale = surface_width(surface) - 1;
+                s->mouse_dx = move->value * scale / 0x7fff;
+                break;
+            case INPUT_AXIS_Y:
+                scale = surface_height(surface) - 1;
+                s->mouse_dy = move->value * scale / 0x7fff;
+                break;
+            default:
+                scale = 0x8000;
+                break;
+            }
+
+//        if (move->axis == INPUT_AXIS_X) {
+//            s->mouse_dx = move->value;
+//        } else if (move->axis == INPUT_AXIS_Y) {
+//            s->mouse_dy = move->value;
+//        }
+//
+//            xenfb->axis[move->axis] = move->value * scale / 0x7fff;
+
+
+
         if (s->mouse_dx > 1023){s->mouse_dx=1023;}
         if (s->mouse_dx < 0){s->mouse_dx=0;}
         if (s->mouse_dy < 0){s->mouse_dy=0;}
@@ -680,25 +768,13 @@ static void ps2_mouse_event(DeviceState *dev, QemuConsole *src,
         }else{
           printf("Mouse Btn %d up\n",btn->button);
         }
-/*
-        if (btn->down) {
-            s->mouse_buttons |= bmap[btn->button];
-            if (btn->button == INPUT_BUTTON_WHEEL_UP) {
-                s->mouse_dz--;
-            } else if (btn->button == INPUT_BUTTON_WHEEL_DOWN) {
-                s->mouse_dz++;
-            }
-        } else {
-            s->mouse_buttons &= ~bmap[btn->button];
-        }
-*/
         break;
 
     default:
         // keep gcc happy 
         break;
     }
-
+*/
 }
 
 
@@ -856,8 +932,8 @@ static void kbd_update_kbd_irq(void *opaque, int level)
 
 
 static QemuInputHandler ps2_mouse_handler = {
-    .name  = "QEMU PS/2 Mouse",
-    .mask  = INPUT_EVENT_MASK_BTN | INPUT_EVENT_MASK_REL,
+    .name  = "QEMU Oberon Mouse",
+    .mask  = INPUT_EVENT_MASK_BTN | INPUT_EVENT_MASK_ABS,
     .event = ps2_mouse_event,
     .sync  = ps2_mouse_sync,
 };
@@ -870,7 +946,7 @@ void *ps2_mouse_init(void (*update_irq)(void *, int), void *update_arg)
 //    trace_ps2_mouse_init(s);
 //    s->common.update_irq = update_irq;
 //    s->common.update_arg = update_arg;
-    s->mousefixed = false;
+//    s->mousefixed = false;
     s->mouse_dx = 0;
     s->mouse_dy = 0;
     vmstate_register(NULL, 0, &vmstate_ps2_mouse, s);
