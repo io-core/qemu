@@ -5,7 +5,8 @@ static const char * const regnames[] = {
     "r4",         "r5",         "r6",        "r7",
     "r8",         "r9",         "ra",        "rb",
     "mt",         "sb",         "sp",        "lr",
-    "fl",         "rh",         "xc",        "pc"
+    "rc",         "rv",         "rn",        "rz",
+    "rh",         "xc",        "pc"
 };
 
 enum {
