@@ -682,7 +682,26 @@ static void timer_hit(void *opaque)
 static void ps2_keyboard_event(DeviceState *dev, QemuConsole *src,
                                InputEvent *evt)
 {
-    printf("Key Event!\n");
+    PS2KbdState *s = (PS2KbdState *)dev;
+    InputKeyEvent *key = evt->u.key.data;
+    int qcode;
+    uint16_t keycode = 0;
+    int mod = 0;
+
+
+    qcode = qemu_input_key_value_to_qcode(key->key);
+
+//    mod = ps2_modifier_bit(qcode);
+
+    if (key->down) {
+        s->modifiers |= mod;
+    } else {
+        s->modifiers &= ~mod;
+    }
+
+    printf("Key %d %d %d\n",qcode,keycode,mod);
+
+
 }
 
 static void ps2_mouse_event(DeviceState *dev, QemuConsole *src,
