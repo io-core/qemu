@@ -114,8 +114,11 @@ typedef struct RISC6Timer {
     QemuConsole  *con;
     void         *kbd;
     void         *mouse;
-    int           mouse_oldx;
-    int           mouse_oldy;
+    int           scalex;
+    int           scaley;
+    int           mousex;
+    int           mousey;
+    int           mousebtns;
     MemoryRegion  mmio;
     MemoryRegion  vram_mem;
     uint32_t      vram_size;
@@ -226,6 +229,7 @@ static void fpga_update_display(void *opaque)
       }
     
       if (y_start >=0){
+        if (y_start > 0 && y_start < height -1){ y_start--;}
         dpy_gfx_update(s->con, 0, y_start, width, y - y_start );
       }
     }
@@ -509,20 +513,10 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
 
     case R_MOUSE:
         s = (PS2MouseState *)t->mouse;
-        if (t->mouse_oldx != s->mouse_dx || t->mouse_oldy != s->mouse_dy){
-          t->mouse_oldx = s->mouse_dx;
-          t->mouse_oldy = s->mouse_dy;
-          printf("IO Read Mouse %d %d\n",t->mouse_oldx,t->mouse_oldy);
-
-//        mx := int32(int16(xpos))
-//        my := int32(int16(ofbh-uint32(ypos)))  //768
-//	if hdpi{
-//          mx = mx * 2
-//          my = my * 2
-//	}
-//        *mptr = uint32(mbr)<<24|uint32(mbm)<<25|uint32(mbl)<<26| (uint32(my)<<12 & 0x00FFF000) | (uint32(mx) & 0x00000FFF)
-
-        r = ((t->mouse_oldy <<12) & 0x00FFF000) | (t->mouse_oldx & 0x00000FFF);
+        if (t->mousex != s->mouse_dx || t->mousey != s->mouse_dy){
+          t->mousex = s->mouse_dx * t->scalex / 0x7fff;
+          t->mousey = 767 - (s->mouse_dy * t->scaley / 0x7fff);
+        r = (s->mouse_buttons << 24) | ((t->mousey <<12) & 0x00FFF000) | (t->mousex & 0x00000FFF);
 
         }
         break;
@@ -694,69 +688,31 @@ static void ps2_keyboard_event(DeviceState *dev, QemuConsole *src,
 static void ps2_mouse_event(DeviceState *dev, QemuConsole *src,
                             InputEvent *evt)
 {
-//    printf("Mouse Event!\n");
-
-/*
-    static const int bmap[INPUT_BUTTON__MAX] = {
-        [INPUT_BUTTON_LEFT]   = PS2_MOUSE_BUTTON_LEFT,
-        [INPUT_BUTTON_MIDDLE] = PS2_MOUSE_BUTTON_MIDDLE,
-        [INPUT_BUTTON_RIGHT]  = PS2_MOUSE_BUTTON_RIGHT,
-        [INPUT_BUTTON_SIDE]   = PS2_MOUSE_BUTTON_SIDE,
-        [INPUT_BUTTON_EXTRA]  = PS2_MOUSE_BUTTON_EXTRA,
-    };
-*/
-/*
     PS2MouseState *s = (PS2MouseState *)dev;
 
     InputMoveEvent *move;
 
     InputBtnEvent *btn;
 
-    DisplaySurface *surface;
-
-    int scale;
-
-    // check if deltas are recorded when disabled 
-//    if (!(s->mouse_status & MOUSE_STATUS_ENABLED))
-//        return;
-
-
-
     switch (evt->type) {
     case INPUT_EVENT_KIND_ABS:
 
+
         move = evt->u.abs.data;
-            surface = qemu_console_surface(src);
+            
             switch (move->axis) {
             case INPUT_AXIS_X:
-                scale = surface_width(surface) - 1;
-                s->mouse_dx = move->value * scale / 0x7fff;
+                
+                s->mouse_dx = move->value ;
                 break;
             case INPUT_AXIS_Y:
-                scale = surface_height(surface) - 1;
-                s->mouse_dy = move->value * scale / 0x7fff;
+                
+                s->mouse_dy = move->value ;
                 break;
             default:
-                scale = 0x8000;
+               
                 break;
             }
-
-//        if (move->axis == INPUT_AXIS_X) {
-//            s->mouse_dx = move->value;
-//        } else if (move->axis == INPUT_AXIS_Y) {
-//            s->mouse_dy = move->value;
-//        }
-//
-//            xenfb->axis[move->axis] = move->value * scale / 0x7fff;
-
-
-
-        if (s->mouse_dx > 1023){s->mouse_dx=1023;}
-        if (s->mouse_dx < 0){s->mouse_dx=0;}
-        if (s->mouse_dy < 0){s->mouse_dy=0;}
-        if (s->mouse_dy > 767){s->mouse_dy=767;}
-
-//        printf("Mouse position %d %d\n",s->mouse_dx,s->mouse_dy);
 
         break;
 
@@ -764,9 +720,33 @@ static void ps2_mouse_event(DeviceState *dev, QemuConsole *src,
 
         btn = evt->u.btn.data;
         if (btn->down) {
-          printf("Mouse Btn %d down\n",btn->button);
+          switch (btn->button) {
+          case 0:
+            s->mouse_buttons = s->mouse_buttons | 4 ;
+            break;
+          case 1:
+            s->mouse_buttons = s->mouse_buttons | 2 ;
+            break;
+          case 2:
+            s->mouse_buttons = s->mouse_buttons | 1 ;
+            break;
+	  default:
+            break;
+          }
         }else{
-          printf("Mouse Btn %d up\n",btn->button);
+          switch (btn->button) {
+          case 0:
+            s->mouse_buttons = s->mouse_buttons & 3 ;
+            break;
+          case 1:
+            s->mouse_buttons = s->mouse_buttons & 5 ;
+            break;
+          case 2:
+            s->mouse_buttons = s->mouse_buttons & 6 ;
+            break;
+          default:
+            break;
+          }
         }
         break;
 
@@ -774,7 +754,7 @@ static void ps2_mouse_event(DeviceState *dev, QemuConsole *src,
         // keep gcc happy 
         break;
     }
-*/
+
 }
 
 
@@ -996,11 +976,16 @@ static void risc6_timer_realize(DeviceState *dev, Error **errp)
 
     sysbus_init_irq(sbd, &t->irq);
 
-    t->mouse_oldx=0;
-    t->mouse_oldy=0;
+    t->mousex=0;
+    t->mousey=0;
+    t->mousebtns = 0;
 
     t->con = graphic_console_init(DEVICE(dev), 0, &video_ops, t);
     qemu_console_resize(t->con, t->width, t->height);
+
+    t->scalex = surface_width(qemu_console_surface(t->con)) - 1;
+    t->scaley = surface_height(qemu_console_surface(t->con)) - 1;
+
 
     t->kbd = ps2_kbd_init( kbd_update_kbd_irq, t);
     t->mouse = ps2_mouse_init( kbd_update_aux_irq, t);
