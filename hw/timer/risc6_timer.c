@@ -223,8 +223,8 @@ static void fpga_update_display(void *opaque)
     unsigned int width, height;
     const uint8_t *pix;
     uint32_t *data;
-    int update;
-    ram_addr_t page;
+//    int update;
+//    ram_addr_t page;
 
     int y, y_start, x, b;
 
@@ -242,22 +242,25 @@ static void fpga_update_display(void *opaque)
     y_start = -1;
 
     for (y = 0; y < height; y++) {
-      page = (ram_addr_t)y * width/8;
-      update = memory_region_snapshot_get_dirty(&s->vram_mem, snap, page, width/8);
-      if (update){
+//      page = (ram_addr_t)y * width/8;
+//      update = memory_region_snapshot_get_dirty(&s->vram_mem, snap, page, width/8);
+//      if (update){
         if (y_start < 0) {y_start = y;}
         for (x = 0; x < width; x=x+8) {
           for (b = 0; b < 8; b++) {
             data[((height-1)*width-(y*width))+x+b] = (((pix[y*width/8+(x/8)] >> b ) & 1 ) == 1 ) ? 0 : BGCOLOR;
           }
         }
-      }
+//      }
     
-      if (y_start >=0){
-        if (y_start > 0 && y_start < height -1){ y_start--;}
-        dpy_gfx_update(s->con, 0, y_start, width, y - y_start );
-      }
+//      if (y_start >=0){
+//        if (y_start > 0 && y_start < height -1){ y_start--;}
+//        dpy_gfx_update(s->con, 0, y_start, width, y - y_start );
+//      }
     }
+
+        dpy_gfx_update(s->con, 0, 0, width, height );
+
 
     g_free(snap);
 
