@@ -43,34 +43,6 @@
 
 #define ROM_FILE    "risc-boot.bin"
 
-/*
-static void cg3_init(hwaddr addr, int vram_size, int width, int height, int depth)
-{
-    DeviceState *dev;
-    SysBusDevice *s;
-
-    dev = qdev_create(NULL, "cgthree");
-
-    qdev_prop_set_uint32(dev, "vram-size", vram_size);
-    qdev_prop_set_uint16(dev, "width", width);
-    qdev_prop_set_uint16(dev, "height", height);
-    qdev_prop_set_uint16(dev, "depth", depth);
-    qdev_init_nofail(dev);
-    s = SYS_BUS_DEVICE(dev);
-
-
-
-//    
-    sysbus_mmio_map(s, 0, addr);
-//    
-    sysbus_mmio_map(s, 1, addr + 0x400000ULL);
-//    
-    sysbus_mmio_map(s, 2, addr + 0x800000ULL);
-
-
-
-}
-*/
 
 static void risc6_fpga_risc_init(MachineState *machine)
 {
@@ -83,27 +55,24 @@ static void risc6_fpga_risc_init(MachineState *machine)
     MemoryRegion *phys_ram = g_new(MemoryRegion, 1);
 
 /*    MemoryRegion *phys_ram_alias = g_new(MemoryRegion, 1); */
-    ram_addr_t rom_base = 0xFFFFF800;
-    ram_addr_t rom_size = 0x2000;    
-    ram_addr_t ram_base = 0x00000000;
-    ram_addr_t ram_size = 0x04000000;
-    ram_addr_t vram_base = 0x04000000;
+    ram_addr_t rom_base  = 0xFFFFF800;
+    ram_addr_t rom_size  = 0x2000;    
+    ram_addr_t ram_base  = 0x00000000;
+    ram_addr_t ram_size  = 0x000e7f00;
+    ram_addr_t vram_base = 0x000e7f00;
     ram_addr_t vram_size = 0x00100000;
+
     qemu_irq *cpu_irq, irq[32];
     int i;
 
 
     /* Physical ROM */
-    memory_region_init_ram(phys_rom, NULL, "risc6.rom", rom_size,
-                           &error_abort);
-
+    memory_region_init_ram(phys_rom, NULL, "risc6.rom", rom_size, &error_abort);
     memory_region_add_subregion(address_space_mem, rom_base, phys_rom);
 
 
     /* Physical DRAM */
-    memory_region_init_ram(phys_ram, NULL, "risc6.ram", ram_size,
-                           &error_abort);
-
+    memory_region_init_ram(phys_ram, NULL, "risc6.ram", ram_size, &error_abort);
     memory_region_add_subregion(address_space_mem, ram_base, phys_ram);
 
 
@@ -119,8 +88,7 @@ static void risc6_fpga_risc_init(MachineState *machine)
 
     /* Register: Internal Interrupt Controller (IIC) */
     dev = qdev_create(NULL, "risc6,iic");
-    object_property_add_const_link(OBJECT(dev), "cpu", OBJECT(cpu),
-                                   &error_abort);
+    object_property_add_const_link(OBJECT(dev), "cpu", OBJECT(cpu), &error_abort);
     qdev_init_nofail(dev);
     sysbus_connect_irq(SYS_BUS_DEVICE(dev), 0, cpu_irq[0]);
     for (i = 0; i < 32; i++) {
@@ -145,14 +113,6 @@ static void risc6_fpga_risc_init(MachineState *machine)
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 1, vram_base );
     sysbus_connect_irq(SYS_BUS_DEVICE(dev), 0, irq[0]);
 
-//    /* Register: Timer sys_clk_timer_1  */
-//    dev = qdev_create(NULL, "RISC6,timer");
-//    qdev_prop_set_uint32(dev, "clock-frequency", 75 * 1000000);
-//    qdev_init_nofail(dev);
-//    sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, 0xe0000880);
-//    sysbus_connect_irq(SYS_BUS_DEVICE(dev), 0, irq[5]);
-
-//    cg3_init( 0x10000000, 0x00100000, graphic_width, graphic_height, graphic_depth);
 
     /* Configure new exception vectors and reset CPU for it to take effect. */
     cpu->reset_addr     = 0xFFFFF800;
@@ -161,6 +121,8 @@ static void risc6_fpga_risc_init(MachineState *machine)
 
     risc6_board_reset(cpu, ram_base, rom_base, ram_size, machine->initrd_filename,
                       ROM_FILE, NULL);
+
+    sleep(1);
 }
 
 static void risc6_fpga_risc_machine_init(struct MachineClass *mc)

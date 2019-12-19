@@ -3,7 +3,7 @@ config RISC6_FPGA
     select RISC6
     select SERIAL
     select RISC6_TIMER
-    
+       
 
 config RISC6
     bool
