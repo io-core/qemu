@@ -223,10 +223,8 @@ static void fpga_update_display(void *opaque)
     unsigned int width, height;
     const uint8_t *pix;
     uint32_t *data;
-//    int update;
-//    ram_addr_t page;
 
-    int y, y_start, x, b;
+    int y, x, b;
 
     width = s->width;
     height = s->height;
@@ -239,24 +237,12 @@ static void fpga_update_display(void *opaque)
                                               memory_region_size(&s->vram_mem),
                                               DIRTY_MEMORY_VGA);
     
-    y_start = -1;
-
     for (y = 0; y < height; y++) {
-//      page = (ram_addr_t)y * width/8;
-//      update = memory_region_snapshot_get_dirty(&s->vram_mem, snap, page, width/8);
-//      if (update){
-        if (y_start < 0) {y_start = y;}
         for (x = 0; x < width; x=x+8) {
           for (b = 0; b < 8; b++) {
             data[((height-1)*width-(y*width))+x+b] = (((pix[y*width/8+(x/8)] >> b ) & 1 ) == 1 ) ? 0 : BGCOLOR;
           }
         }
-//      }
-    
-//      if (y_start >=0){
-//        if (y_start > 0 && y_start < height -1){ y_start--;}
-//        dpy_gfx_update(s->con, 0, y_start, width, y - y_start );
-//      }
     }
 
         dpy_gfx_update(s->con, 0, 0, width, height );
@@ -264,84 +250,7 @@ static void fpga_update_display(void *opaque)
 
     g_free(snap);
 
-/*
-    const uint8_t *pix,*pixo;
-    uint32_t *data;
-    uint32_t dval;
-    int b, x; 
-    int y, y_start;
-    unsigned int width, height;
-    ram_addr_t page;
-    DirtyBitmapSnapshot *snap = NULL;
 
-    printf("fpga update display\n");
-
-    if (surface_bits_per_pixel(surface) != 32) {
-        return;
-    }
-    width = s->width;
-    height = s->height;
-
-    y_start = -1;
-    pix = memory_region_get_ram_ptr(&s->vram_mem);
-    pixo = pix;
-    data = (uint32_t *)surface_data(surface);
-
-    if (!s->full_update) {
-        snap = memory_region_snapshot_and_clear_dirty(&s->vram_mem, 0x0,
-                                              memory_region_size(&s->vram_mem),
-                                              DIRTY_MEMORY_VGA);
-    }
-    for (y = 0; y < height; y++) {
-        int update;
-
-        page = (ram_addr_t)y * width/8;
-
-        if (s->full_update) {
-            update = 1;
-        } else {
-            update = memory_region_snapshot_get_dirty(&s->vram_mem, snap, page,
-                                                      width);
-        }
-
-        if (update) {
-            if (y_start < 0) {
-                y_start = y;
-            }
-
-            for (x = 0; x < width/8; x++) {
-                if ((long int)pix - (long int)pixo < ((1024 * 768)/8) ){
-                  dval = *pix++;
-                  for (b = 0; b < 8; b++) {
-                    int pindex = ((height-y)*width)+(x*8)+b;
-                    if (pindex >= 0 && pindex < (1024 * 768 * 4)){
-                      data[((height-y)*width)+(x*8)+b] = (((dval >> b ) & 1 ) == 1 ) ? 0 : BGCOLOR ; 
-                    }else{
-                      printf("display buffer write overflow: %d\n",pindex);
-                    }
-               //   *data++ = (((dval >> b ) & 1 ) == 1 ) ? 0 : BGCOLOR ;
-                  }
-                }else{
-		   printf("frame buffer read overflow: %ld\n",(long int)pix - (long int)pixo);
-                }
-            }
-
-        } else {
-            if (y_start >= 0) {
-                dpy_gfx_update(s->con, 0, y_start, width, y - y_start);
-                y_start = -1;
-            }
-            pix += width/8;
-            data += width;
-        }
-    }
-    s->full_update = 0;
-    if (y_start >= 0) {
-        dpy_gfx_update(s->con, 0, y_start, width, y - y_start);
-    }
-    
-    g_free(snap);
-*/
 }
 
 static void fpga_invalidate_display(void *opaque)
@@ -416,7 +325,7 @@ static void disk_run_command(RISC6Timer *t){
       t->tx_buf[0] = 0;
       t->tx_buf[1] = 254;
       printf("Seek %8u for read\n",arg);
-      t->disk_index = ((arg -  524290 ));//(unsigned int)t->disk_offset) );// * 512;
+      t->disk_index = ((arg -  t->disk_offset ));//(unsigned int)t->disk_offset) );// * 512;
 //      printf("Sector index %8u for read\n",t->disk_index);
       read_sector(t);
       t->tx_cnt = 2 + 128;
@@ -424,7 +333,7 @@ static void disk_run_command(RISC6Timer *t){
     case 88: 
       t->disk_state = diskWrite;
       printf("Seek %8u for write\n",arg);
-      t->disk_index = ((arg -  524290));//(unsigned int)t->disk_offset) );// * 512;
+      t->disk_index = ((arg -  t->disk_offset ));//(unsigned int)t->disk_offset) );// * 512;
 //      printf("Sector index %8u for write\n",t->disk_index);
       t->tx_buf[0] = 0;
       t->tx_cnt = 1;
@@ -1085,8 +994,10 @@ static void risc6_timer_init(Object *obj)
        }else{
             printf("Read disk block zero success, signature %d %d %d %d\n",t->buf[0],t->buf[1],t->buf[2],t->buf[3]);
             if (t->buf[0]==141 && t->buf[1]==163 && t->buf[2]==30 && t->buf[3]==155){
-               t->disk_offset = 0x80002; // 524290
-            }
+               t->disk_offset =  524290;
+            }else{
+               t->disk_offset =  0;
+	    }
 
        }
 
