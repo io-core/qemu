@@ -75,6 +75,7 @@ static void risc6_fpga_risc_init(MachineState *machine)
     memory_region_init_ram(phys_ram, NULL, "risc6.ram", ram_size, &error_abort);
     memory_region_add_subregion(address_space_mem, ram_base, phys_ram);
 
+//    unsigned int smp_cpus = machine->smp.cpus;
 
     /* Create CPU -- FIXME */
 
@@ -82,6 +83,39 @@ static void risc6_fpga_risc_init(MachineState *machine)
 
 
     cpu = RISC6_CPU(x);
+
+
+/*
+    for (n = 0; n < smp_cpus; n++) {
+        CPUXtensaState *cenv = NULL;
+
+        cpu = XTENSA_CPU(cpu_create(machine->cpu_type));
+        cenv = &cpu->env;
+        if (!env) {
+            env = cenv;
+            freq = env->config->clock_freq_khz * 1000;
+        }
+
+        if (mx_pic) {
+            MemoryRegion *mx_eri;
+
+            mx_eri = xtensa_mx_pic_register_cpu(mx_pic,
+                                                xtensa_get_extints(cenv),
+                                                xtensa_get_runstall(cenv));
+            memory_region_add_subregion(xtensa_get_er_region(cenv),
+                                        0, mx_eri);
+        }
+        cenv->sregs[PRID] = n;
+        xtensa_select_static_vectors(cenv, n != 0);
+        qemu_register_reset(xtfpga_reset, cpu);
+        // Need MMU initialized prior to ELF loading,
+        // so that ELF gets loaded into virtual addresses
+        //
+        cpu_reset(CPU(cpu));
+    }
+*/
+
+
 
     /* Register: CPU interrupt controller (PIC) */
     cpu_irq = risc6_cpu_pic_init(cpu);
@@ -130,6 +164,10 @@ static void risc6_fpga_risc_machine_init(struct MachineClass *mc)
     mc->desc = "Oberon RISC6 FPGA Emulated Devboard";
     mc->init = risc6_fpga_risc_init;
     mc->is_default = 1;
+    mc->min_cpus = 1;
+    mc->max_cpus = 4;
+
+
 
     if (graphic_depth != 8 && graphic_depth != 24) {
         error_report("Unsupported depth: %d", graphic_depth);
