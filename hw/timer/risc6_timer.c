@@ -120,12 +120,12 @@ typedef struct RISC6Timer {
     MemoryRegion  mmio;
     MemoryRegion  vram_mem;
     uint32_t      vram_size;
+    uint32_t      freq_hz;
     uint32_t      milliseconds;
     int           full_update;
     uint16_t      width, height, depth;
     qemu_irq      irq;
     uint32_t      spi_sel;
-    uint32_t      freq_hz;
     ptimer_state *ptimer;
     BlockBackend *blk;
     uint8_t      *buf;
@@ -273,23 +273,18 @@ static const GraphicHwOps video_ops = {
 
 static int timer_irq_state(RISC6Timer *t)
 {
-    bool irq = (t->regs[R_STATUS] & STATUS_TO) &&
-               (t->regs[R_CONTROL] & CONTROL_ITO);
+    bool irq = false; //(t->regs[R_STATUS] & STATUS_TO) &&
+                      //(t->regs[R_CONTROL] & CONTROL_ITO);
     return irq;
 }
 
 static void read_sector(RISC6Timer *t){
-//  printf("Read Sector\n");
   uint8_t abuf[1024];
   uint32_t * r;
-
-//  printf("index is %d byte offset is %d\n",t->disk_index,t->disk_index*512);
 
   if (t->disk_size < ((t->disk_index)*512)+512) {
     printf("Disk Read Past End\n");
   }else{
-
-//    sleep(.02);
 
     int alen = blk_pread(t->blk, (t->disk_index)*512, abuf, 512);
 
@@ -297,16 +292,14 @@ static void read_sector(RISC6Timer *t){
       printf("Disk Read Error\n");
     }
 
-//    sleep(.02);
-
     r = (uint32_t *) &abuf;
     int i;
     for (i = 0; i < 128; i++) {
-//      printf("%08x\n",*r);
+
       r = (uint32_t *) &(abuf[i*4]);
       t->tx_buf[i+2] = *r;
       r++;
-//      t->tx_buf[i+2] = abuf[i*4+0] | (abuf[i*4+1] << 8) | (abuf[i*4+2] << 16) | (abuf[i*4+3] << 24);  
+
     }
   }
 
@@ -325,9 +318,9 @@ static void disk_run_command(RISC6Timer *t){
       t->disk_state = diskRead;
       t->tx_buf[0] = 0;
       t->tx_buf[1] = 254;
-      printf("Seek %8u for read\n",arg);
+//      printf("Seek %8u for read\n",arg);
       t->disk_index = ((arg -  t->disk_offset ));//(unsigned int)t->disk_offset) );// * 512;
-//      printf("Sector index %8u for read\n",t->disk_index);
+
       read_sector(t);
       t->tx_cnt = 2 + 128;
       break;
@@ -370,9 +363,9 @@ static void spi_write(RISC6Timer *t, uint32_t value){
           t->rx_buf[t->rx_idx] = value;
           t->rx_idx++;
           if (t->rx_idx == 6) {
-//            if (t->rx_buf[0]|t->rx_buf[1]|t->rx_buf[2]|t->rx_buf[3]|t->rx_buf[4]|t->rx_buf[5]) {
-//              printf(" %d %d %d %d %d %d\n",t->rx_buf[0],t->rx_buf[1],t->rx_buf[2],t->rx_buf[3],t->rx_buf[4],t->rx_buf[5]);
-//            }
+
+
+
             disk_run_command(t);
             t->rx_idx = 0;
           }
@@ -424,13 +417,10 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
 
     addr >>= 2;
 
-//    printf("RISC6 IO READ OF: %ld\n",addr);
-
     switch (addr) {
-
-
     case R_MILLISECONDS:
-//        printf("IO Read Milliseconds\n");
+//       printf("IO Read Millisecond %d\n",t->milliseconds);
+        r = t->milliseconds;
         break;
     case R_LED:	      
         printf("IO Read LED\n");
@@ -490,8 +480,6 @@ static void timer_write(void *opaque, hwaddr addr,
                         uint64_t value, unsigned int size)
 {
     RISC6Timer *t = opaque;
-    uint64_t tvalue;
-    uint32_t count = 0;
     int irqState = timer_irq_state(t);
 
     addr >>= 2;
@@ -545,45 +533,45 @@ static void timer_write(void *opaque, hwaddr addr,
         }
         break;
 
-    case R_STATUS:
-        /* The timeout bit is cleared by writing the status register. */
-        t->regs[R_STATUS] &= ~STATUS_TO;
-        break;
-
-    case R_CONTROL:
-        ptimer_transaction_begin(t->ptimer);
-        t->regs[R_CONTROL] = value & (CONTROL_ITO | CONTROL_CONT);
-        if ((value & CONTROL_START) &&
-            !(t->regs[R_STATUS] & STATUS_RUN)) {
-            ptimer_run(t->ptimer, 1);
-            t->regs[R_STATUS] |= STATUS_RUN;
-        }
-        if ((value & CONTROL_STOP) && (t->regs[R_STATUS] & STATUS_RUN)) {
-            ptimer_stop(t->ptimer);
-            t->regs[R_STATUS] &= ~STATUS_RUN;
-        }
-        ptimer_transaction_commit(t->ptimer);
-        break;
-
-    case R_PERIODL:
-    case R_PERIODH:
-        ptimer_transaction_begin(t->ptimer);
-        t->regs[addr] = value & 0xFFFF;
-        if (t->regs[R_STATUS] & STATUS_RUN) {
-            ptimer_stop(t->ptimer);
-            t->regs[R_STATUS] &= ~STATUS_RUN;
-        }
-        tvalue = (t->regs[R_PERIODH] << 16) | t->regs[R_PERIODL];
-        ptimer_set_limit(t->ptimer, tvalue + 1, 1);
-        ptimer_transaction_commit(t->ptimer);
-        break;
-
-    case R_SNAPL:
-    case R_SNAPH:
-        count = ptimer_get_count(t->ptimer);
-        t->regs[R_SNAPL] = count & 0xFFFF;
-        t->regs[R_SNAPH] = count >> 16;
-        break;
+//    case R_STATUS:
+//        /* The timeout bit is cleared by writing the status register. */
+//        t->regs[R_STATUS] &= ~STATUS_TO;
+//        break;
+//
+//    case R_CONTROL:
+//        ptimer_transaction_begin(t->ptimer);
+//        t->regs[R_CONTROL] = value & (CONTROL_ITO | CONTROL_CONT);
+//        if ((value & CONTROL_START) &&
+//            !(t->regs[R_STATUS] & STATUS_RUN)) {
+//            ptimer_run(t->ptimer, 1);
+//            t->regs[R_STATUS] |= STATUS_RUN;
+//        }
+//        if ((value & CONTROL_STOP) && (t->regs[R_STATUS] & STATUS_RUN)) {
+//            ptimer_stop(t->ptimer);
+//            t->regs[R_STATUS] &= ~STATUS_RUN;
+//        }
+//        ptimer_transaction_commit(t->ptimer);
+//        break;
+//
+//    case R_PERIODL:
+//    case R_PERIODH:
+//        ptimer_transaction_begin(t->ptimer);
+//        t->regs[addr] = value & 0xFFFF;
+//        if (t->regs[R_STATUS] & STATUS_RUN) {
+//            ptimer_stop(t->ptimer);
+//            t->regs[R_STATUS] &= ~STATUS_RUN;
+//        }
+//        tvalue = (t->regs[R_PERIODH] << 16) | t->regs[R_PERIODL];
+//        ptimer_set_limit(t->ptimer, tvalue + 1, 1);
+//        ptimer_transaction_commit(t->ptimer);
+//        break;
+//
+//    case R_SNAPL:
+//    case R_SNAPH:
+//        count = ptimer_get_count(t->ptimer);
+//        t->regs[R_SNAPL] = count & 0xFFFF;
+//        t->regs[R_SNAPH] = count >> 16;
+//        break;
 
     default:
         break;
@@ -607,22 +595,17 @@ static const MemoryRegionOps timer_ops = {
 static void timer_hit(void *opaque)
 {
     RISC6Timer *t = opaque;
-    const uint64_t tvalue = (t->regs[R_PERIODH] << 16) | t->regs[R_PERIODL];
+    t->milliseconds++;
+    ptimer_set_limit(t->ptimer, 1, 1); //tvalue + 1, 1);
 
-    printf("Timer Hit\n");
-
-    t->regs[R_STATUS] |= STATUS_TO;
-
-    ptimer_set_limit(t->ptimer, tvalue + 1, 1);
-
-    if (!(t->regs[R_CONTROL] & CONTROL_CONT)) {
-        t->regs[R_STATUS] &= ~STATUS_RUN;
-        ptimer_set_count(t->ptimer, tvalue);
-    } else {
+//    if (!(t->regs[R_CONTROL] & CONTROL_CONT)) {
+//        t->regs[R_STATUS] &= ~STATUS_RUN;
+//        ptimer_set_count(t->ptimer, tvalue);
+//    } else {
         ptimer_run(t->ptimer, 1);
-    }
+//    }
 
-    qemu_set_irq(t->irq, timer_irq_state(t));
+//    qemu_set_irq(t->irq, timer_irq_state(t));
 }
 
 
@@ -726,29 +709,7 @@ static void ps2_mouse_event(DeviceState *dev, QemuConsole *src,
 
 static void ps2_mouse_sync(DeviceState *dev)
 {
-    PS2MouseState *s = (PS2MouseState *)dev;
-
-//    printf("Mouse Sync %d %d %d !\n",s->mouse_dx,s->mouse_dy,s->mouse_dz);
-
-
-//    /* do not sync while disabled to prevent stream corruption */
-//    if (!(s->mouse_status & MOUSE_STATUS_ENABLED)) {
-//        return;
-//    }
-
-//    if (s->mouse_buttons) {
-//        qemu_system_wakeup_request(QEMU_WAKEUP_REASON_OTHER, NULL);
-//    }
-    if (!(s->mouse_status & MOUSE_STATUS_REMOTE)) {
-//        /* if not remote, send event. Multiple events are sent if
-//           too big deltas */
-//        while (ps2_mouse_send_packet(s)) {
-//            if (s->mouse_dx == 0 && s->mouse_dy == 0 && s->mouse_dz == 0)
-//                break;
-//        }
-//      s->mouse_dx = 0 ;
-//      s->mouse_dy = 0 ;
-    }
+    
 }
 
 
@@ -849,15 +810,11 @@ void *ps2_kbd_init(void (*update_irq)(void *, int), void *update_arg);
 void *ps2_kbd_init(void (*update_irq)(void *, int), void *update_arg)
 {
     PS2KbdState *s = (PS2KbdState *)g_malloc0(sizeof(PS2KbdState));
-
-//    trace_ps2_kbd_init(s);
-//    s->common.update_irq = update_irq;
-//    s->common.update_arg = update_arg;
     s->scancode_set = 2;
     vmstate_register(NULL, 0, &vmstate_ps2_keyboard, s);
     qemu_input_handler_register((DeviceState *)s,
                                 &ps2_keyboard_handler);
-//    qemu_register_reset(ps2_kbd_reset, s);
+
     s->key_count = 0;
     return s;
 }
@@ -868,13 +825,7 @@ void *ps2_kbd_init(void (*update_irq)(void *, int), void *update_arg)
 
 static void kbd_update_kbd_irq(void *opaque, int level)
 {
-//    KBDState *s = (KBDState *)opaque;
 
-//    if (level)
-//        s->pending |= KBD_PENDING_KBD;
-//    else
-//        s->pending &= ~KBD_PENDING_KBD;
-//    kbd_update_irq(s);
 }
 
 
@@ -890,16 +841,12 @@ void *ps2_mouse_init(void (*update_irq)(void *, int), void *update_arg)
 {
     PS2MouseState *s = (PS2MouseState *)g_malloc0(sizeof(PS2MouseState));
 
-//    trace_ps2_mouse_init(s);
-//    s->common.update_irq = update_irq;
-//    s->common.update_arg = update_arg;
-//    s->mousefixed = false;
     s->mouse_dx = 0;
     s->mouse_dy = 0;
     vmstate_register(NULL, 0, &vmstate_ps2_mouse, s);
     qemu_input_handler_register((DeviceState *)s,
                                 &ps2_mouse_handler);
-//    qemu_register_reset(ps2_mouse_reset, s);
+
     return s;
 }
 
@@ -907,13 +854,7 @@ void *ps2_mouse_init(void (*update_irq)(void *, int), void *update_arg)
 
 static void kbd_update_aux_irq(void *opaque, int level)
 {
-//    KBDState *s = (KBDState *)opaque;
 
-//    if (level)
-//        s->pending |= KBD_PENDING_AUX;
-//    else
-//        s->pending &= ~KBD_PENDING_AUX;
-//    kbd_update_irq(s);
 }
 
 
@@ -922,14 +863,10 @@ static void risc6_timer_realize(DeviceState *dev, Error **errp)
     RISC6Timer *t = RISC6_TIMER(dev);
     SysBusDevice *sbd = SYS_BUS_DEVICE(dev);
 
-    if (t->freq_hz == 0) {
-        error_setg(errp, "\"clock-frequency\" property must be provided.");
-        return;
-    }
 
     t->ptimer = ptimer_init(timer_hit, t, PTIMER_POLICY_DEFAULT);
     ptimer_transaction_begin(t->ptimer);
-    ptimer_set_freq(t->ptimer, t->freq_hz);
+    ptimer_set_freq(t->ptimer, 1000 ); 
     ptimer_transaction_commit(t->ptimer);
 
     memory_region_init_io(&t->mmio, OBJECT(t), &timer_ops, t,
@@ -1041,13 +978,14 @@ static void risc6_timer_reset(DeviceState *dev)
 
     ptimer_transaction_begin(t->ptimer);
     ptimer_stop(t->ptimer);
-    ptimer_set_limit(t->ptimer, 0xffffffff, 1);
+    ptimer_set_limit(t->ptimer, 1, 1); //0xffffffff, 1);
+    ptimer_run(t->ptimer, 1);
     ptimer_transaction_commit(t->ptimer);
     memset(t->regs, 0, sizeof(t->regs));
     t->spi_sel = 0;
     t->disk_state = 0;
     //disk_file;
-    t->disk_offset = 0;
+//    t->disk_offset = 0;
     t->rx_idx = 0;
     t->tx_cnt = 0;
     t->tx_idx = 0;
@@ -1056,7 +994,7 @@ static void risc6_timer_reset(DeviceState *dev)
 }
 
 static Property risc6_timer_properties[] = {
-    DEFINE_PROP_UINT32("clock-frequency", RISC6Timer, freq_hz, 0),
+    DEFINE_PROP_UINT32("clock-frequency", RISC6Timer, freq_hz, 1000),
     DEFINE_PROP_UINT32("vram-size",       RISC6Timer, vram_size, -1),
     DEFINE_PROP_UINT16("width",           RISC6Timer, width,     -1),
     DEFINE_PROP_UINT16("height",          RISC6Timer, height,    -1),
