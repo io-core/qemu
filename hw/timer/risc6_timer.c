@@ -120,6 +120,7 @@ typedef struct RISC6Timer {
     MemoryRegion  mmio;
     MemoryRegion  vram_mem;
     uint32_t      vram_size;
+    uint32_t      milliseconds;
     int           full_update;
     uint16_t      width, height, depth;
     qemu_irq      irq;
@@ -608,6 +609,8 @@ static void timer_hit(void *opaque)
     RISC6Timer *t = opaque;
     const uint64_t tvalue = (t->regs[R_PERIODH] << 16) | t->regs[R_PERIODL];
 
+    printf("Timer Hit\n");
+
     t->regs[R_STATUS] |= STATUS_TO;
 
     ptimer_set_limit(t->ptimer, tvalue + 1, 1);
@@ -1048,7 +1051,7 @@ static void risc6_timer_reset(DeviceState *dev)
     t->rx_idx = 0;
     t->tx_cnt = 0;
     t->tx_idx = 0;
-
+    t->milliseconds = 0;
     t->debugcount = -1;
 }
 
