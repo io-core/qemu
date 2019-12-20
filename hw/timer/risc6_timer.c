@@ -117,6 +117,8 @@ typedef struct RISC6Timer {
     int           mousex;
     int           mousey;
     int           mousebtns;
+    bool	  lctrldown;
+    bool	  rctrldown;
     MemoryRegion  mmio;
     MemoryRegion  vram_mem;
     uint32_t      vram_size;
@@ -166,6 +168,8 @@ typedef struct PS2State {
 
 typedef struct {
     PS2State common;
+    bool lctrldown;
+    bool rctrldown;
     int scan_enabled;
     int translate;
     int scancode_set; // 1=XT, 2=AT, 3=PS/2 
@@ -414,7 +418,8 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
     PS2KbdState *k;
 
     uint64_t r = 0;
-
+    uint32_t kcd;
+    
     addr >>= 2;
 
     switch (addr) {
@@ -446,8 +451,10 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
         if (t->mousex != m->mouse_dx || t->mousey != m->mouse_dy){
           t->mousex = m->mouse_dx * t->scalex / 0x7fff;
           t->mousey = 767 - (m->mouse_dy * t->scaley / 0x7fff);
+          if(k->lctrldown){kcd = 2 << 24;}else{kcd = 0;}
+          if(k->rctrldown){kcd = kcd | 1 << 24;}
         r = (k->key_count > 0 ?  0x10000000 : 0) | 
-                        (m->mouse_buttons << 24) | 
+                        (m->mouse_buttons << 24) |  kcd |
                  ((t->mousey <<12) & 0x00FFF000) | 
                         (t->mousex & 0x00000FFF);
         }
@@ -623,12 +630,14 @@ static void ps2_keyboard_event(DeviceState *dev, QemuConsole *src,
     if (key->down) {
 
       k->key_buf[k->key_count++]=(uint8_t)qcode;
-
-      printf("Key %d 0x%x\n",scan,qcode);
+      if (scan==3) {k->lctrldown = true;}
+      if (scan==4) {k->rctrldown = true;}
+//      printf("Key %d 0x%x\n",scan,qcode);
     } else {
       k->key_buf[k->key_count++]=0xF0;
       k->key_buf[k->key_count++]=(uint8_t)qcode;
-
+      if (scan==3) {k->lctrldown = false;}
+      if (scan==4) {k->rctrldown = false;}
     }
 
 
@@ -814,7 +823,8 @@ void *ps2_kbd_init(void (*update_irq)(void *, int), void *update_arg)
     vmstate_register(NULL, 0, &vmstate_ps2_keyboard, s);
     qemu_input_handler_register((DeviceState *)s,
                                 &ps2_keyboard_handler);
-
+    s->lctrldown = false;
+    s->rctrldown = false;
     s->key_count = 0;
     return s;
 }
@@ -990,6 +1000,8 @@ static void risc6_timer_reset(DeviceState *dev)
     t->tx_cnt = 0;
     t->tx_idx = 0;
     t->milliseconds = 0;
+    t->lctrldown = false;
+    t->rctrldown = false;
     t->debugcount = -1;
 }
 
