@@ -340,7 +340,12 @@ static void regop_decode_opc(DisasContext * ctx){
       t0 = tcg_temp_new_i32();
       t_31 = tcg_temp_new_i32();
       tcg_gen_mov_tl(t_31, cpu_R[REGB]);
-      tcg_gen_add_tl(cpu_R[REGA], cpu_R[REGB], cval);
+      if ((ctx->opcode & 0x20000000) == 0){
+        tcg_gen_add_tl(cpu_R[REGA], cpu_R[REGB], cval);
+      }else{
+        tcg_gen_add_tl(t0, cpu_R[REGA], cval);
+        tcg_gen_add_tl(cpu_R[REGA], t0, cpu_R[R_C]);
+      }
       tcg_gen_setcond_i32(TCG_COND_LTU, cpu_R[R_C], cpu_R[REGA], t_31);
       tcg_temp_free_i32(t0);
       tcg_temp_free_i32(t_31);
@@ -351,7 +356,12 @@ static void regop_decode_opc(DisasContext * ctx){
       t0 = tcg_temp_new_i32();
       t_31 = tcg_temp_new_i32();
       tcg_gen_mov_i32(t_31, cpu_R[REGB]);
-      tcg_gen_sub_tl(cpu_R[REGA], cpu_R[REGB],cval);
+      if ((ctx->opcode & 0x20000000) == 0){
+        tcg_gen_sub_tl(cpu_R[REGA], cpu_R[REGB],cval);
+      }else{
+        tcg_gen_sub_tl(t0, cpu_R[REGB],cval);
+        tcg_gen_sub_tl(cpu_R[REGA], t0, cpu_R[R_C]);
+      }
       tcg_gen_setcond_i32(TCG_COND_GTU, cpu_R[R_C], cpu_R[REGA], t_31);
       tcg_temp_free_i32(t0);
       tcg_temp_free_i32(t_31);
@@ -580,9 +590,9 @@ static void risc6_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
      tcg_temp_free(t_31);
     tcg_temp_free(cval);
     }
-
-
 */
+
+
 
 
 
