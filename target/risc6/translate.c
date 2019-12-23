@@ -335,8 +335,6 @@ static void regop_decode_opc(DisasContext * ctx){
       tcg_gen_xor_tl(cpu_R[REGA], cpu_R[REGB], cval);
       break;
     case ADD:
-//        risc->C = a_val < b_val;
-//        risc->V = ((a_val ^ c_val) & (a_val ^ b_val)) >> 31;
       t0 = tcg_temp_new_i32();
       t_31 = tcg_temp_new_i32();
       tcg_gen_mov_tl(t_31, cpu_R[REGB]);
@@ -346,13 +344,17 @@ static void regop_decode_opc(DisasContext * ctx){
         tcg_gen_add_tl(t0, cpu_R[REGA], cval);
         tcg_gen_add_tl(cpu_R[REGA], t0, cpu_R[R_C]);
       }
+//        risc->C = a_val < b_val;
       tcg_gen_setcond_i32(TCG_COND_LTU, cpu_R[R_C], cpu_R[REGA], t_31);
+//        risc->V = ((a_val ^ c_val) & (a_val ^ b_val)) >> 31;
+      tcg_gen_xor_tl(t0, cpu_R[REGA], t_31);
+      tcg_gen_xor_tl(t_31, cpu_R[REGA], cval);
+      tcg_gen_and_tl(cval, t0, t_31);
+      tcg_gen_shri_tl(cpu_R[R_V], cval, 31);
       tcg_temp_free_i32(t0);
       tcg_temp_free_i32(t_31);
       break;
     case SUB:
-//        risc->C = a_val > b_val;
-//        risc->V = ((b_val ^ c_val) & (a_val ^ b_val)) >> 31;
       t0 = tcg_temp_new_i32();
       t_31 = tcg_temp_new_i32();
       tcg_gen_mov_i32(t_31, cpu_R[REGB]);
@@ -362,7 +364,13 @@ static void regop_decode_opc(DisasContext * ctx){
         tcg_gen_sub_tl(t0, cpu_R[REGB],cval);
         tcg_gen_sub_tl(cpu_R[REGA], t0, cpu_R[R_C]);
       }
+//        risc->C = a_val > b_val;
       tcg_gen_setcond_i32(TCG_COND_GTU, cpu_R[R_C], cpu_R[REGA], t_31);
+//        risc->V = ((b_val ^ c_val) & (a_val ^ b_val)) >> 31;
+      tcg_gen_xor_tl(t0, cpu_R[REGA], t_31);
+      tcg_gen_xor_tl(t_31, t_31, cval);
+      tcg_gen_and_tl(cval, t0, t_31);
+      tcg_gen_shri_tl(cpu_R[R_V], cval, 31);
       tcg_temp_free_i32(t0);
       tcg_temp_free_i32(t_31);
       break;
