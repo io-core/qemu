@@ -375,8 +375,11 @@ static void regop_decode_opc(DisasContext * ctx){
       tcg_temp_free_i32(t_31);
       break;
     case MUL:
-      tcg_gen_mulu2_tl(cpu_R[REGA], cpu_R[R_H], cpu_R[REGB], cval);
-
+      if ((ctx->opcode & 0x20000000) == 0){  // signed multiplication
+        tcg_gen_muls2_tl(cpu_R[REGA], cpu_R[R_H], cpu_R[REGB], cval);
+      }else{ // unsigned
+        tcg_gen_mulu2_tl(cpu_R[REGA], cpu_R[R_H], cpu_R[REGB], cval);
+      }
       break;
     case DIV:
       tcg_gen_divu_tl(cpu_R[REGA], cpu_R[REGB], cval);
