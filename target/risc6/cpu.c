@@ -55,7 +55,7 @@ static void risc6_cpu_reset(CPUState *cs)
     ncc->parent_reset(cs);
 
     memset(env->regs, 0, sizeof(uint32_t) * NUM_CORE_REGS);
-    env->regs[R_PC] = 0xFFFFE000;  // cpu->reset_addr;
+    env->regs[R_PC] = 0xFFFFF800;  // cpu->reset_addr;
 
     env->regs[CR_STATUS] = 0;
 
