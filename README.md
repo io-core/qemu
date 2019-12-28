@@ -7,7 +7,7 @@ you clone this (git clone https://github.com/io-core/qemu-risc6) you will want t
 
 git checkout risc6
 
-Otherwise you will not see the RISC6 target.
+Otherwise you might not see the RISC6 target.
 
 <img src="https://github.com/io-core/qemu-risc6/blob/risc6/Oberon.png?raw=true">
 
