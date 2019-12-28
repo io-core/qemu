@@ -9,6 +9,9 @@ you clone this you will want to do the following within the repo directory:
 
 git checkout risc6
 
+![screenshot of Oberon](https://github.com/io-core/qemu-risc6/blob/risc6/Oberon.png?raw=true)
+
+
 
 ===========
 QEMU README
