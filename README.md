@@ -30,5 +30,9 @@ QEMU is a large project and there are lots of files in it. For RISC6 some key fi
 
 The target qemu-system-risc6 has been succesfully compiled on Linux and on OSX. It should also be possible to compile it on Windows with some effort.
 
-An example command line:
-./risc6-softmmu/qemu-system-risc6 -machine fpga-risc -display gtk -g 1024x768x8 -monitor stdio -device loader,file=hw/risc6/risc-boot.bin,addr=0xfffff800 -drive format=raw,file=IO.img -smp 1
+An example command line running Oberon from the unmodified disk image downloaded from projectoberon.com:
+
+./risc6-softmmu/qemu-system-risc6 -machine fpga-risc -display gtk -g 1024x768x8 -monitor stdio -device loader,file=hw/risc6/risc-boot.bin,addr=0xfffff800 -drive format=raw,file=RISC.img -smp 1
+
+<img src="https://github.com/io-core/qemu-risc6/blob/risc6/ClassicOberon.png?raw=true">
+
