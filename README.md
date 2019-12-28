@@ -1,5 +1,3 @@
-
-=================
 qemu-risc6 README
 =================
 
@@ -12,7 +10,6 @@ git checkout risc6
 <img src="https://github.com/io-core/qemu-risc6/blob/risc6/Oberon.png?raw=true">
 
 
-===========
 QEMU README
 ===========
 
