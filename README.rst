@@ -9,7 +9,7 @@ you clone this you will want to do the following within the repo directory:
 
 git checkout risc6
 
-![screenshot of Oberon](Oberon.png)
+![screenshot of Oberon](/Oberon.png)
 
 
 
