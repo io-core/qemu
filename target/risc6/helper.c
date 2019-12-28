@@ -29,26 +29,6 @@
 #include "exec/helper-proto.h"
 #include "hw/semihosting/semihost.h"
 
-#if defined(CONFIG_USER_ONLY)
-
-void risc6_cpu_do_interrupt(CPUState *cs)
-{
-    RISC6CPU *cpu = RISC6_CPU(cs);
-    CPURISC6State *env = &cpu->env;
-    cs->exception_index = -1;
-    env->regs[R_EA] = env->regs[R_PC] + 4;
-}
-
-bool risc6_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
-                        MMUAccessType access_type, int mmu_idx,
-                        bool probe, uintptr_t retaddr)
-{
-    cs->exception_index = 0xaa;
-    cpu_loop_exit_restore(cs, retaddr);
-}
-
-#else /* !CONFIG_USER_ONLY */
-
 void risc6_cpu_do_interrupt(CPUState *cs)
 {
     RISC6CPU *cpu = RISC6_CPU(cs);
@@ -56,7 +36,7 @@ void risc6_cpu_do_interrupt(CPUState *cs)
 
     switch (cs->exception_index) {
     case EXCP_IRQ:
-        assert(env->regs[CR_STATUS] & CR_STATUS_PIE);
+//        assert(env->regs[CR_STATUS] & CR_STATUS_PIE);
 
         qemu_log_mask(CPU_LOG_INT, "interrupt at pc=%x\n", env->regs[R_PC]);
 
@@ -314,4 +294,3 @@ bool risc6_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
 */
 
 }
-#endif /* !CONFIG_USER_ONLY */

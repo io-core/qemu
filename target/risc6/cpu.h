@@ -67,7 +67,7 @@ typedef struct RISC6CPUClass {
 
 
 /* r0-r9, ra, rb, mt, sb, sp ,lr , rc, rv, rn, rz, rh, xc, pc */
-#define NUM_CORE_REGS 23 
+#define NUM_CORE_REGS 24 
 
 /* General purpose register aliases */
 
@@ -87,32 +87,15 @@ typedef struct RISC6CPUClass {
 #define R_SB     13
 #define R_SP     14
 #define R_LR     15
-#define R_C          16
-#define R_V          17
-#define R_N          18
-#define R_Z          19
-#define R_H          20
-#define R_XC         21
-#define R_PC         22
+#define R_C      16
+#define R_V      17
+#define R_N      18
+#define R_Z      19
+#define R_I      20
+#define R_H      21
+#define R_XC     22
+#define R_PC     23
 
-
-
-/* Control register aliases */
-
-#define CR_BASE  16
-#define CR_STATUS    (CR_BASE + 0)
-#define   CR_STATUS_PIE  (1 << 0)
-#define   CR_STATUS_U    (1 << 1)
-#define   CR_STATUS_EH   (1 << 2)
-#define   CR_STATUS_IH   (1 << 3)
-#define   CR_STATUS_IL   (63 << 4)
-#define   CR_STATUS_CRS  (63 << 10)
-#define   CR_STATUS_PRS  (63 << 16)
-#define   CR_STATUS_NMI  (1 << 22)
-#define   CR_STATUS_RSIE (1 << 23)
-
-#define CR_IENABLE   (CR_BASE + 0)
-#define CR_IPENDING  (CR_BASE + 0)
 
 
 
@@ -179,38 +162,34 @@ typedef struct RISC6CPU {
     uint32_t fast_tlb_miss_addr;
 } RISC6CPU;
 
-//static inline RISC6CPU *risc6_env_get_cpu(CPURISC6State *env)
-//{
-//    return RISC6_CPU(container_of(env, RISC6CPU, env));
-//}
-//#define ENV_GET_CPU(e) CPU(risc6_env_get_cpu(e))
-//#define ENV_OFFSET offsetof(RISC6CPU, env)
-
 void risc6_tcg_init(void);
+
 void risc6_cpu_do_interrupt(CPUState *cs);
+
 int cpu_risc6_signal_handler(int host_signum, void *pinfo, void *puc);
+
 void dump_mmu(CPURISC6State *env);
+
 void risc6_cpu_dump_state(CPUState *cpu, FILE *f, int flags);
+
 hwaddr risc6_cpu_get_phys_page_debug(CPUState *cpu, vaddr addr);
+
 void risc6_cpu_do_unaligned_access(CPUState *cpu, vaddr addr,
                                    MMUAccessType access_type,
                                    int mmu_idx, uintptr_t retaddr);
 
 qemu_irq *risc6_cpu_pic_init(RISC6CPU *cpu);
+
 void risc6_check_interrupts(CPURISC6State *env);
 
 void do_risc6_semihosting(CPURISC6State *env);
 
 #define TARGET_PHYS_ADDR_SPACE_BITS 32
 #define TARGET_VIRT_ADDR_SPACE_BITS 32
-
 #define CPU_RESOLVING_TYPE TYPE_RISC6_CPU
-
 #define cpu_gen_code cpu_risc6_gen_code
 #define cpu_signal_handler cpu_risc6_signal_handler
-
 #define CPU_SAVE_VERSION 1
-
 #define TARGET_PAGE_BITS 12
 
 /* MMU modes definitions */
@@ -221,8 +200,7 @@ void do_risc6_semihosting(CPURISC6State *env);
 
 static inline int cpu_mmu_index(CPURISC6State *env, bool ifetch)
 {
-    return (env->regs[CR_STATUS] & CR_STATUS_U) ? MMU_USER_IDX :
-                                                  MMU_SUPERVISOR_IDX;
+    return MMU_SUPERVISOR_IDX;
 }
 
 bool risc6_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
@@ -231,7 +209,7 @@ bool risc6_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
 
 static inline int cpu_interrupts_enabled(CPURISC6State *env)
 {
-    return env->regs[CR_STATUS] & CR_STATUS_PIE;
+    return env->regs[R_I] & 2;
 }
 
 typedef CPURISC6State CPUArchState;
@@ -244,7 +222,7 @@ static inline void cpu_get_tb_cpu_state(CPURISC6State *env, target_ulong *pc,
 {
     *pc = env->regs[R_PC];
     *cs_base = 0;
-    *flags = (env->regs[CR_STATUS] & (CR_STATUS_EH | CR_STATUS_U));
+    *flags = (env->regs[R_I] & 2);
 }
 
 #endif /* RISC6_CPU_H */

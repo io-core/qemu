@@ -57,7 +57,7 @@ static void risc6_cpu_reset(CPUState *cs)
     memset(env->regs, 0, sizeof(uint32_t) * NUM_CORE_REGS);
     env->regs[R_PC] = 0xFFFFF800;  // cpu->reset_addr;
 
-    env->regs[CR_STATUS] = 0;
+    env->regs[R_I] = 0;
 
 }
 
@@ -100,7 +100,7 @@ static bool risc6_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     CPURISC6State *env = &cpu->env;
 
     if ((interrupt_request & CPU_INTERRUPT_HARD) &&
-        (env->regs[CR_STATUS] & CR_STATUS_PIE)) {
+        (env->regs[R_I] & 2)) {
         cs->exception_index = EXCP_IRQ;
         risc6_cpu_do_interrupt(cs);
         return true;
@@ -122,43 +122,41 @@ static void risc6_cpu_disas_set_info(CPUState *cpu, disassemble_info *info)
 
 static int risc6_cpu_gdb_read_register(CPUState *cs, uint8_t *mem_buf, int n)
 {
-//    RISC6CPU *cpu = RISC6_CPU(cs);
-//    CPUClass *cc = CPU_GET_CLASS(cs);
-//    CPURISC6State *env = &cpu->env;
-//
-//    if (n > cc->gdb_num_core_regs) {
-//        return 0;
-//    }
-//
-//    if (n < 32) {          /* GP regs */
-//        return gdb_get_reg32(mem_buf, env->regs[n]);
-//    } else if (n == 32) {    /* PC */
-//        return gdb_get_reg32(mem_buf, env->regs[R_PC]);
-//    } else if (n < 49) {     /* Status regs */
-//        return gdb_get_reg32(mem_buf, env->regs[n - 1]);
-//    }
-//
+    RISC6CPU *cpu = RISC6_CPU(cs);
+    CPUClass *cc = CPU_GET_CLASS(cs);
+    CPURISC6State *env = &cpu->env;
+
+    if (n > cc->gdb_num_core_regs) {
+        return 0;
+    }
+
+    if (n < 22) {          /* GP regs */
+        return gdb_get_reg32(mem_buf, env->regs[n]);
+    } else if (n == 22) {    /* PC */
+        return gdb_get_reg32(mem_buf, env->regs[R_PC]);
+    }
+    
+
     /* Invalid regs */
     return 0;
 }
 
 static int risc6_cpu_gdb_write_register(CPUState *cs, uint8_t *mem_buf, int n)
 {
-//    RISC6CPU *cpu = RISC6_CPU(cs);
-//    CPUClass *cc = CPU_GET_CLASS(cs);
-//    CPURISC6State *env = &cpu->env;
-//
-//    if (n > cc->gdb_num_core_regs) {
-//        return 0;
-//    }
-//
-//    if (n < 32) {            /* GP regs */
-//        env->regs[n] = ldl_p(mem_buf);
-//    } else if (n == 32) {    /* PC */
-//        env->regs[R_PC] = ldl_p(mem_buf);
-//    } else if (n < 49) {     /* Status regs */
-//        env->regs[n - 1] = ldl_p(mem_buf);
-//    }
+    RISC6CPU *cpu = RISC6_CPU(cs);
+    CPUClass *cc = CPU_GET_CLASS(cs);
+    CPURISC6State *env = &cpu->env;
+
+    if (n > cc->gdb_num_core_regs) {
+        return 0;
+    }
+
+    if (n < 22) {            /* GP regs */
+        env->regs[n] = ldl_p(mem_buf);
+    } else if (n == 22) {    /* PC */
+        env->regs[R_PC] = ldl_p(mem_buf);
+    }
+    
 
     return 4;
 }

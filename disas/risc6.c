@@ -66,7 +66,7 @@ void ins2str( unsigned long addr, unsigned long insn, char * dstr){
 
          }else{
            if ((insn & 0x10000000)!=0){
-             creg = 17; //R_H
+             creg = 21; //R_H
              printf("H\n");
            }else{
              creg = 16; //R_FLG

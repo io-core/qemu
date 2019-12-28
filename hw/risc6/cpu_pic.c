@@ -36,13 +36,13 @@ static void risc6_pic_cpu_handler(void *opaque, int irq, int level)
     if (type == CPU_INTERRUPT_HARD) {
         env->irq_pending = level;
 
-        if (level && (env->regs[CR_STATUS] & CR_STATUS_PIE)) {
-            env->irq_pending = 0;
-            cpu_interrupt(cs, type);
-        } else if (!level) {
+//        if (level && (env->regs[CR_STATUS] & CR_STATUS_PIE)) {
+//            env->irq_pending = 0;
+//            cpu_interrupt(cs, type);
+//        } else if (!level) {
             env->irq_pending = 0;
             cpu_reset_interrupt(cs, type);
-        }
+//        }
     } else {
         if (level) {
             cpu_interrupt(cs, type);

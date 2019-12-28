@@ -114,10 +114,14 @@ void risc6_cpu_dump_state(CPUState *cs, FILE *f, int flags)
             qemu_fprintf(f, "\n");
         }
     }
-    for (i = 20; i < NUM_CORE_REGS; i++) {
+    for (i = 21; i < NUM_CORE_REGS; i++) {
         qemu_fprintf(f, "%9s=%8.8x ", regnames[i], env->regs[i]);
     }
-    qemu_fprintf(f, "%4s=%d %s=%d %s=%d %s=%d ", "C", env->regs[16], "V", env->regs[17], "N", env->regs[18], "Z", env->regs[19]);
+    qemu_fprintf(f, "%4s=%d %s=%d %s=%d %s=%d %s=%d", "C", env->regs[16], 
+                                                      "V", env->regs[17], 
+                                                      "N", env->regs[18], 
+                                                      "Z", env->regs[19], 
+                                                      "I", env->regs[20]);
 
     qemu_fprintf(f, "\n\n");
 
@@ -377,7 +381,7 @@ static void regop_decode_opc(DisasContext * ctx){
     case MUL:
       if ((ctx->opcode & 0x20000000) == 0){  // signed multiplication
         tcg_gen_muls2_tl(cpu_R[REGA], cpu_R[R_H], cpu_R[REGB], cval);
-      }else{ // unsigned
+      }else{                                 // unsigned
         tcg_gen_mulu2_tl(cpu_R[REGA], cpu_R[R_H], cpu_R[REGB], cval);
       }
       break;

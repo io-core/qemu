@@ -44,10 +44,10 @@ typedef struct RISC6IIC {
 
 static void update_irq(RISC6IIC *pv)
 {   
-    CPURISC6State *env = &((RISC6CPU *)(pv->cpu))->env;
+//    CPURISC6State *env = &((RISC6CPU *)(pv->cpu))->env;
 
-    qemu_set_irq(pv->parent_irq,
-                 env->regs[CR_IPENDING] & env->regs[CR_IENABLE]);
+    qemu_set_irq(pv->parent_irq, 1);
+         //        env->regs[CR_IPENDING] & env->regs[CR_IENABLE]);
 }
 
 static void irq_handler(void *opaque, int irq, int level)
@@ -55,8 +55,9 @@ static void irq_handler(void *opaque, int irq, int level)
     RISC6IIC *pv = opaque;
     CPURISC6State *env = &((RISC6CPU *)(pv->cpu))->env;
 
-    env->regs[CR_IPENDING] &= ~(1 << irq);
-    env->regs[CR_IPENDING] |= !!level << irq;
+    env->regs[R_I] |= 1; 
+//    env->regs[CR_IPENDING] &= ~(1 << irq);
+//    env->regs[CR_IPENDING] |= !!level << irq;
 
     update_irq(pv);
 }
