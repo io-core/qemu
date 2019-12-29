@@ -311,7 +311,28 @@ static void read_sector(RISC6Timer *t){
 
 static void write_sector(RISC6Timer *t){
   printf("Write Sector\n");
+//  bytes:=make([]byte, 512)
+//  for i := 0; i < 128; i++ {
+//    bytes[i*4+0] = uint8(board.Disk.rx_buf[i]      )
+//    bytes[i*4+1] = uint8(board.Disk.rx_buf[i] >>  8)
+//    bytes[i*4+2] = uint8(board.Disk.rx_buf[i] >> 16)
+//    bytes[i*4+3] = uint8(board.Disk.rx_buf[i] >> 24)
+//  }
+//  board.Disk.File.Write(bytes)
+
+  if (t->disk_size < ((t->disk_index)*512)+512) {
+    printf("Disk Write Past End\n");
+  }else{
+    int alen = blk_pwrite(t->blk, (t->disk_index)*12, (char *)t->rx_buf, 512, 0);
+    if (alen != 512) {
+      printf("Disk Write Error\n");
+    }
+
+  }
+
 }
+
+
 
 static void disk_run_command(RISC6Timer *t){
   uint32_t cmd = t->rx_buf[0];
