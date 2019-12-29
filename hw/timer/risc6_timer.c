@@ -323,7 +323,7 @@ static void write_sector(RISC6Timer *t){
   if (t->disk_size < ((t->disk_index)*512)+512) {
     printf("Disk Write Past End\n");
   }else{
-    int alen = blk_pwrite(t->blk, (t->disk_index)*12, (char *)t->rx_buf, 512, 0);
+    int alen = blk_pwrite(t->blk, (t->disk_index)*512, (char *)t->rx_buf, 512, 0);
     if (alen != 512) {
       printf("Disk Write Error\n");
     }
@@ -925,6 +925,17 @@ static void risc6_timer_realize(DeviceState *dev, Error **errp)
     t->kbd = ps2_kbd_init( kbd_update_kbd_irq, t);
     t->mouse = ps2_mouse_init( kbd_update_aux_irq, t);
 
+       if (t->blk) {
+            if (blk_is_read_only(t->blk)) {
+                error_setg(errp, "Can't use a read-only drive");
+                return;
+            }
+            int ret = blk_set_perm(t->blk, BLK_PERM_CONSISTENT_READ | BLK_PERM_WRITE,
+                               BLK_PERM_ALL, errp);
+            if (ret < 0) {
+                return;
+            }
+       }
 
 
 }
@@ -944,6 +955,8 @@ static void risc6_timer_init(Object *obj)
     if (dinfo) {
        t->blk = blk_by_legacy_dinfo(dinfo);
        printf("Have dinfo\n");
+
+
        size = blk_getlength(t->blk);
        t->disk_size=0;
        if (size <= 0) {
