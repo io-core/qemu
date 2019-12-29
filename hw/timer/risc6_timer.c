@@ -311,14 +311,6 @@ static void read_sector(RISC6Timer *t){
 
 static void write_sector(RISC6Timer *t){
   printf("Write Sector\n");
-//  bytes:=make([]byte, 512)
-//  for i := 0; i < 128; i++ {
-//    bytes[i*4+0] = uint8(board.Disk.rx_buf[i]      )
-//    bytes[i*4+1] = uint8(board.Disk.rx_buf[i] >>  8)
-//    bytes[i*4+2] = uint8(board.Disk.rx_buf[i] >> 16)
-//    bytes[i*4+3] = uint8(board.Disk.rx_buf[i] >> 24)
-//  }
-//  board.Disk.File.Write(bytes)
 
   if (t->disk_size < ((t->disk_index)*512)+512) {
     printf("Disk Write Past End\n");
@@ -489,6 +481,10 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
         }
         break;
 
+    case R_DEBUG:
+
+        r = (uint64_t)t->width << 16 | (uint64_t)t->depth ;
+        break;
     case R_CONTROL:
         r = t->regs[R_CONTROL] & (CONTROL_ITO | CONTROL_CONT);
         break;
@@ -561,45 +557,6 @@ static void timer_write(void *opaque, hwaddr addr,
         }
         break;
 
-//    case R_STATUS:
-//        /* The timeout bit is cleared by writing the status register. */
-//        t->regs[R_STATUS] &= ~STATUS_TO;
-//        break;
-//
-//    case R_CONTROL:
-//        ptimer_transaction_begin(t->ptimer);
-//        t->regs[R_CONTROL] = value & (CONTROL_ITO | CONTROL_CONT);
-//        if ((value & CONTROL_START) &&
-//            !(t->regs[R_STATUS] & STATUS_RUN)) {
-//            ptimer_run(t->ptimer, 1);
-//            t->regs[R_STATUS] |= STATUS_RUN;
-//        }
-//        if ((value & CONTROL_STOP) && (t->regs[R_STATUS] & STATUS_RUN)) {
-//            ptimer_stop(t->ptimer);
-//            t->regs[R_STATUS] &= ~STATUS_RUN;
-//        }
-//        ptimer_transaction_commit(t->ptimer);
-//        break;
-//
-//    case R_PERIODL:
-//    case R_PERIODH:
-//        ptimer_transaction_begin(t->ptimer);
-//        t->regs[addr] = value & 0xFFFF;
-//        if (t->regs[R_STATUS] & STATUS_RUN) {
-//            ptimer_stop(t->ptimer);
-//            t->regs[R_STATUS] &= ~STATUS_RUN;
-//        }
-//        tvalue = (t->regs[R_PERIODH] << 16) | t->regs[R_PERIODL];
-//        ptimer_set_limit(t->ptimer, tvalue + 1, 1);
-//        ptimer_transaction_commit(t->ptimer);
-//        break;
-//
-//    case R_SNAPL:
-//    case R_SNAPH:
-//        count = ptimer_get_count(t->ptimer);
-//        t->regs[R_SNAPL] = count & 0xFFFF;
-//        t->regs[R_SNAPH] = count >> 16;
-//        break;
 
     default:
         break;
@@ -626,14 +583,7 @@ static void timer_hit(void *opaque)
     t->milliseconds++;
     ptimer_set_limit(t->ptimer, 1, 1); //tvalue + 1, 1);
 
-//    if (!(t->regs[R_CONTROL] & CONTROL_CONT)) {
-//        t->regs[R_STATUS] &= ~STATUS_RUN;
-//        ptimer_set_count(t->ptimer, tvalue);
-//    } else {
         ptimer_run(t->ptimer, 1);
-//    }
-
-//    qemu_set_irq(t->irq, timer_irq_state(t));
 }
 
 
