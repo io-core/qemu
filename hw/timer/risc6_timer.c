@@ -482,8 +482,9 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
         break;
 
     case R_DEBUG:
+        r = (uint64_t)t->width << 20 | (uint64_t)t->height << 8 | ((uint64_t)t->depth & 255);
+//        printf("DEBUG READ: %04x %04x %08lx\n",t->width,t->height,r);
 
-        r = (uint64_t)t->width << 16 | (uint64_t)t->depth ;
         break;
     case R_CONTROL:
         r = t->regs[R_CONTROL] & (CONTROL_ITO | CONTROL_CONT);

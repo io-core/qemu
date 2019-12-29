@@ -8,93 +8,90 @@ def tohex(val, nbits):
 
 
 f0 = {
-		"MOV" : 0,
-		"LSL" : 1,
-		"ASR" : 2,
-		"ROR" : 3,
-		"AND" : 4,
-                "ANN" : 5,
-                "IOR" : 6,
-                "XOR" : 7,
-                "ADD" : 8,
-                "SUB" : 9,
-                "MUL" : 10,
-                "DIV" : 11,
-                "FAD" : 12,
-                "FSB" : 13,
-                "FML" : 14,
-                "FDV" : 15,
-                "MOV'" : 16,
-                "ADD'" : 24,
-                "SUB'" : 25,
-                "MUL'" : 26
+		"mov" : 0,
+		"lsl" : 1,
+		"asr" : 2,
+		"ror" : 3,
+		"and" : 4,
+                "ann" : 5,
+                "ior" : 6,
+                "xor" : 7,
+                "add" : 8,
+                "sub" : 9,
+                "mul" : 10,
+                "div" : 11,
+                "fad" : 12,
+                "fsb" : 13,
+                "fml" : 14,
+                "fdv" : 15,
+                "mov'" : 16,
+                "add'" : 24,
+                "sub'" : 25,
+                "mul'" : 26
      }
 
 f2 = {
-                "LDR" : 8,
-                "LDB" : 9,
-                "STR" : 10,
-                "STB" : 11
+                "ld" : 8,
+                "ldb" : 9,
+                "st" : 10,
+                "stb" : 11
      }
 
 f3 = {
-                "BMI" : 0,
-                "BEQ" : 1,
-                "BCS" : 2,
-                "BVS" : 3,
-                "BLS" : 4,
-                "BLT" : 5,
-                "BLE" : 6,
-                "BR" : 7,
-                "BPL" : 8,
-                "BNE" : 9,
-                "BCC" : 10,
-                "BVC" : 11,
-                "BHI" : 12,
-                "BGE" : 13,
-                "BGT" : 14,
-                "NOP" : 15,
-                "BMIL" : 16,
-                "BEQL" : 17,
-                "BCSL" : 18,
-                "BVSL" : 19,
-                "BLSL" : 20,
-                "BLTL" : 21,
-                "BLEL" : 22,
-                "JSR" : 23,
-                "BPLL" : 24,
-                "BNEL" : 25,
-                "BCCL" : 26,
-                "BVCL" : 27,
-                "BHIL" : 28,
-                "BGEL" : 29,
-                "BGTL" : 30,
-                "NOPL" : 31,
-                "RTS"  : 32
+                "bmi" : 0,
+                "beq" : 1,
+                "bcs" : 2,
+                "bvs" : 3,
+                "bls" : 4,
+                "blt" : 5,
+                "ble" : 6,
+                "br" : 7,
+                "bpl" : 8,
+                "bne" : 9,
+                "bcc" : 10,
+                "bvc" : 11,
+                "bhi" : 12,
+                "bge" : 13,
+                "bgt" : 14,
+                "nop" : 15,
+                "bmi." : 16,
+                "beq." : 17,
+                "bcs." : 18,
+                "bvs." : 19,
+                "bls." : 20,
+                "blt." : 21,
+                "ble." : 22,
+                "br." : 23,
+                "bpl." : 24,
+                "bne." : 25,
+                "bcc." : 26,
+                "bvc." : 27,
+                "bhi." : 28,
+                "bge." : 29,
+                "bgt." : 30,
+                "nop." : 31,
+                "rts"  : 32
      }
 
 reg = {
-                "R0" : 0,
-                "R1" : 1,
-                "R2" : 2,
-                "R3" : 3,
-                "R4" : 4,
-                "R5" : 5,
-                "R6" : 6,
-                "R7" : 7,
-                "R8" : 8,
-                "R9" : 9,
-                "R10" : 10,
-                "R11" : 11,
-                "R12" : 12,
-                "R13" : 13,
-                "R14" : 14,
-                "R15" : 15,
-                "BP" : 13,
-                "SP" : 14,
-                "LNK" : 15,
-                "H" : 16,
-                "NZCV" : 17
+                "r0" : 0,
+                "r1" : 1,
+                "r2" : 2,
+                "r3" : 3,
+                "r4" : 4,
+                "r5" : 5,
+                "r6" : 6,
+                "r7" : 7,
+                "r8" : 8,
+                "r9" : 9,
+                "ra" : 10,
+                "rb" : 11,
+                "mt" : 12,
+                "sb" : 13,
+                "sp" : 14,
+                "lr" : 15,
+                "rh" : 16,
+                "fl" : 17
 
      }
 
@@ -123,7 +120,7 @@ else:
       if not line :
         break;
 
-      elems=line.upper().split()
+      elems=line.split()
       if len(elems)>0:
         op = elems[0]
         if op.endswith(':'):
@@ -148,7 +145,7 @@ else:
 
      
 
-      elems=line.upper().split()
+      elems=line.split()
       if len(elems)>0:
         op = elems[0]
         if op.endswith(':'):
@@ -180,11 +177,11 @@ else:
                   aux = True
           
                 if crv in reg:
-                  if crv == "H":
+                  if crv == "rh":
                     tnib = "2"
                     image.append([tnib+hdec[dst]+hdec[breg]+hdec[opc]+"0000",""])
                     print(hex(cpos)[2:].zfill(8)+" "+tnib+hdec[dst]+hdec[breg]+hdec[opc]+"0000"+"  "+op+" r"+str(dst)+" "+crv)
-                  elif crv == "NZCV":
+                  elif crv == "fl":
                     tnib = "3"
                     image.append([tnib+hdec[dst]+hdec[breg]+hdec[opc]+"0000",""])
                     print(hex(cpos)[2:].zfill(8)+" "+tnib+hdec[dst]+hdec[breg]+hdec[opc]+"0000"+"  "+op+" r"+str(dst)+" "+crv)
@@ -205,8 +202,9 @@ else:
                     if len(val)==1:
                       val="000"+val
                     if len(val)>4:
-                      print("Constant too large")
-                      ok = False
+                      val=val[-4:];
+                      #print("Constant too large")
+                      #ok = False
                     if val[0]>"7":
                       if tnib=="6":
                         tnib="7"
@@ -246,8 +244,9 @@ else:
                     if len(val)==1:
                       val="000"+val
                     if len(val)>4:
-                      print("Constant too large")
-                      ok = False
+                      val=val[-4:];
+                      #print("Constant too large")
+                      #ok = False
                     if val[0]>"7":
                       tnib="5"
                     image.append([tnib+hdec[dst]+hdec[breg]+hdec[opc]+val,""])
@@ -270,7 +269,11 @@ else:
           crv=elems[3]
           val="00000"
           if crv.endswith('H'):
-                    val=crv[:-1]
+                     print("Constant must be decimal not hex")
+                     ok = False
+          else:
+#                    print("-->",hex(int(crv))[2:],"<--")
+                    val=hex(int(crv))[2:];
                     if len(val)==4:
                       val="0"+val
                     if len(val)==3:
@@ -280,7 +283,11 @@ else:
                     if len(val)==1:
                       val="0000"+val
                     if len(val)>5:
+                      val=val[-5:];
                       print("Constant too large")
+                      ok = False
+          
+
           image.append([tnib+hdec[areg]+hdec[breg]+val,""])
           print(hex(cpos)[2:].zfill(8)+" "+tnib+hdec[areg]+hdec[breg]+val+"  "+op+" r"+str(areg)+" r"+str(breg)+" "+crv)
           cpos = cpos + 4
@@ -306,8 +313,9 @@ else:
                     if len(val)==1:
                       val="00000"+val
                     if len(val)>6:
-                      print("Constant too large")
-                      ok = False
+                      val=val[-6:];
+                      #print("Constant too large")
+                      #ok = False
           if bcond==32:
             bcond=7
             tnib="C"
@@ -323,8 +331,8 @@ else:
             aux = True
             tnib="F"
             if crv in reg:
-              image.append([tnib+hdec[bcond]+"----0"+hdec[reg[crv]],""])
-              print(hex(cpos)[2:].zfill(8)+" "+tnib+hdec[bcond]+"----0"+hdec[reg[crv]]+"  "+op+" "+crv)
+              image.append([tnib+hdec[bcond]+"00000"+hdec[reg[crv]],""])
+              print(hex(cpos)[2:].zfill(8)+" "+tnib+hdec[bcond]+"00000"+hdec[reg[crv]]+"  "+op+" "+crv)
             else:
               if len(val) > 0:
                 image.append([tnib+hdec[bcond]+val,""])
@@ -348,7 +356,7 @@ else:
                 print(hex(cpos)[2:].zfill(8)+" "+tnib+hdec[bcond]+"000000"+"  "+op+" "+crv)
           cpos = cpos + 4
         else:
-          print("unknown op")
+          print("unknown op",op)
           ok = False
       if not ok:
         break;
@@ -366,6 +374,8 @@ else:
       else:
         word = i[0][:2]+tohex(  (label[i[1]][0] - (cpos+4))>>2 ,24 )[2:].zfill(6)
       cpos = cpos + 4
+#      print(word[6:8]+" "+word[4:6]+" "+word[2:4]+" "+word[:2])
+
       ba=bytearray.fromhex(word[6:8]+" "+word[4:6]+" "+word[2:4]+" "+word[:2])
       for byte in ba:
         f.write(byte.to_bytes(1, byteorder='big'))
