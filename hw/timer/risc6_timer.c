@@ -310,7 +310,7 @@ static void read_sector(RISC6Timer *t){
 }
 
 static void write_sector(RISC6Timer *t){
-  printf("Write Sector\n");
+//  printf("Write Sector\n");
 
   if (t->disk_size < ((t->disk_index)*512)+512) {
     printf("Disk Write Past End\n");
@@ -343,7 +343,7 @@ static void disk_run_command(RISC6Timer *t){
       break;
     case 88: 
       t->disk_state = diskWrite;
-      printf("Seek %8u for write\n",arg);
+//      printf("Seek %8u for write\n",arg);
       t->disk_index = ((arg -  t->disk_offset ));//(unsigned int)t->disk_offset) );// * 512;
 //      printf("Sector index %8u for write\n",t->disk_index);
       t->tx_buf[0] = 0;
@@ -463,7 +463,7 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
         k = (PS2KbdState *)t->kbd;
         if (t->mousex != m->mouse_dx || t->mousey != m->mouse_dy){
           t->mousex = m->mouse_dx * t->scalex / 0x7fff;
-          t->mousey = 767 - (m->mouse_dy * t->scaley / 0x7fff);
+          t->mousey = t->height - (m->mouse_dy * t->scaley / 0x7fff);
           if(k->lctrldown){kcd = 2 << 24;}else{kcd = 0;}
           if(k->rctrldown){kcd = kcd | 1 << 24;}
         r = (k->key_count > 0 ?  0x10000000 : 0) | 

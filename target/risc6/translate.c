@@ -45,14 +45,8 @@ typedef struct DisasContext {
     uint32_t tbflags;  /* should stay unmodified during the TB translation */
     uint32_t envflags; /* should stay in sync with env->flags using TCG ops */
     int memidx;
-//    int gbank;
-//    int fbank;
-//    uint32_t delayed_pc;
-//    uint32_t features;
 
     uint32_t opcode;
-
-//    bool has_movcal;
 } DisasContext;
 
 /* Target-specific values for ctx->base.is_jmp.  */
@@ -63,15 +57,9 @@ typedef struct DisasContext {
 /* global register indexes */
 static TCGv cpu_R[NUM_CORE_REGS];
 
-//static TCGv cpu_gregs[32];
-//static TCGv cpu_sr, cpu_sr_m, cpu_sr_q, cpu_sr_t;
 
 static TCGv cpu_pc, cpu_sr_t; //, cpu_ssr, cpu_spc, cpu_gbr;
 
-//static TCGv cpu_vbr, cpu_sgr, cpu_dbr, cpu_mach, cpu_macl;
-//static TCGv cpu_pr, cpu_fpscr, cpu_fpul;
-//static TCGv cpu_lock_addr, cpu_lock_value;
-//static TCGv cpu_fregs[32];
 
 /* internal register indexes */
 static TCGv cpu_flags; //, cpu_delayed_pc, cpu_delayed_cond;
@@ -81,26 +69,16 @@ static TCGv cpu_flags; //, cpu_delayed_pc, cpu_delayed_cond;
 void risc6_tcg_init(void)
 {
     int i;
-
     for (i = 0; i < NUM_CORE_REGS; i++) {
-        cpu_R[i] = tcg_global_mem_new(cpu_env,
-                                      offsetof(CPURISC6State, regs[i]),
-                                      regnames[i]);
+        cpu_R[i] = tcg_global_mem_new(cpu_env, offsetof(CPURISC6State, regs[i]), regnames[i]);
     }
-
-    cpu_pc = tcg_global_mem_new_i32(cpu_env,
-                                    offsetof(CPURISC6State, pc), "PC");
-
-    cpu_sr_t = tcg_global_mem_new_i32(cpu_env,
-                                      offsetof(CPURISC6State, sr_t), "SR_T");
-    cpu_flags = tcg_global_mem_new_i32(cpu_env,
-				       offsetof(CPURISC6State, flags), "_flags_");
-
+    cpu_pc = tcg_global_mem_new_i32(cpu_env, offsetof(CPURISC6State, pc), "PC");
+    cpu_sr_t = tcg_global_mem_new_i32(cpu_env, offsetof(CPURISC6State, sr_t), "SR_T");
+    cpu_flags = tcg_global_mem_new_i32(cpu_env, offsetof(CPURISC6State, flags), "_flags_");
 }
 
 void risc6_cpu_dump_state(CPUState *cs, FILE *f, int flags)
 {
-
     RISC6CPU *cpu = RISC6_CPU(cs);
     CPURISC6State *env = &cpu->env;
     int i;
@@ -117,14 +95,11 @@ void risc6_cpu_dump_state(CPUState *cs, FILE *f, int flags)
     for (i = 21; i < NUM_CORE_REGS; i++) {
         qemu_fprintf(f, "%9s=%8.8x ", regnames[i], env->regs[i]);
     }
-    qemu_fprintf(f, "%4s=%d %s=%d %s=%d %s=%d %s=%d", "C", env->regs[16], 
-                                                      "V", env->regs[17], 
-                                                      "N", env->regs[18], 
-                                                      "Z", env->regs[19], 
-                                                      "I", env->regs[20]);
-
-    qemu_fprintf(f, "\n\n");
-
+    qemu_fprintf(f, "%4s=%d %s=%d %s=%d %s=%d %s=%d\n\n", "C", env->regs[16], 
+                                                          "V", env->regs[17], 
+                                                          "N", env->regs[18], 
+                                                          "Z", env->regs[19], 
+                                                          "I", env->regs[20]);
 
 }
 
@@ -134,12 +109,6 @@ static inline void gen_save_cpu_state(DisasContext *ctx, bool save_pc)
     if (save_pc) {
         tcg_gen_movi_i32(cpu_pc, ctx->base.pc_next);
     }
-//    if (ctx->delayed_pc != (uint32_t) -1) {
-//        tcg_gen_movi_i32(cpu_delayed_pc, ctx->delayed_pc);
-//    }
-//    if ((ctx->tbflags & TB_FLAG_ENVFLAGS_MASK) != ctx->envflags) {
-//        tcg_gen_movi_i32(cpu_flags, ctx->envflags);
-//    }
 }
 
 static inline bool use_exit_tb(DisasContext *ctx)
@@ -175,62 +144,6 @@ static void gen_goto_tb(DisasContext *ctx, int n, target_ulong dest)
     ctx->base.is_jmp = DISAS_NORETURN;
 }
 
-/*
-static void gen_jump(DisasContext * ctx)
-{
-    if (ctx->delayed_pc == -1) {
-	// Target is not statically known, it comes necessarily from a
-	// delayed jump as immediate jump are conditinal jumps 
-	tcg_gen_mov_i32(cpu_pc, cpu_delayed_pc);
-        tcg_gen_discard_i32(cpu_delayed_pc);
-        if (ctx->base.singlestep_enabled) {
-//            gen_helper_debug(cpu_env);
-        } else if (use_exit_tb(ctx)) {
-            tcg_gen_exit_tb(NULL, 0);
-        } else {
-            tcg_gen_lookup_and_goto_ptr();
-        }
-        ctx->base.is_jmp = DISAS_NORETURN;
-    } else {
-	gen_goto_tb(ctx, 0, ctx->delayed_pc);
-    }
-}
-*/
-
-/* Immediate conditional jump (bt or bf) */
-/*
-static void gen_conditional_jump(DisasContext *ctx, target_ulong dest,
-                                 bool jump_if_true)
-{
-    TCGLabel *l1 = gen_new_label();
-    TCGCond cond_not_taken = jump_if_true ? TCG_COND_EQ : TCG_COND_NE;
-
-    gen_save_cpu_state(ctx, false);
-    tcg_gen_brcondi_i32(cond_not_taken, cpu_sr_t, 0, l1);
-    gen_goto_tb(ctx, 0, dest);
-    gen_set_label(l1);
-    gen_goto_tb(ctx, 1, ctx->base.pc_next + 4);
-    ctx->base.is_jmp = DISAS_NORETURN;
-}
-*/
-/* Delayed conditional jump (bt or bf) */
-/*
-static void gen_delayed_conditional_jump(DisasContext * ctx)
-{
-    TCGLabel *l1 = gen_new_label();
-    TCGv ds = tcg_temp_new();
-
-    tcg_gen_mov_i32(ds, cpu_delayed_cond);
-    tcg_gen_discard_i32(cpu_delayed_cond);
-
-
-    tcg_gen_brcondi_i32(TCG_COND_NE, ds, 0, l1);
-    gen_goto_tb(ctx, 1, ctx->base.pc_next + 2);
-    gen_set_label(l1);
-    gen_jump(ctx);
-}
-*/
-
 #define IMM16 (ctx->opcode & 0xffff)
 #define IMM20s (ctx->opcode & 0x80000 ? 0xfff00000 | (ctx->opcode & 0xfffff) : (ctx->opcode & 0xfffff))
 #define IMM24 (ctx->opcode & 0xffffff)
@@ -241,29 +154,11 @@ static void gen_delayed_conditional_jump(DisasContext * ctx)
 #define REGC (ctx->opcode & 0xf)
 #define OPU ((ctx->opcode >>29) & 1)
 
-#define B3_0 (ctx->opcode & 0xf)
-#define B6_4 ((ctx->opcode >> 4) & 0x7)
-#define B7_4 ((ctx->opcode >> 4) & 0xf)
-#define B7_0 (ctx->opcode & 0xff)
-#define B7_0s ((int32_t) (int8_t) (ctx->opcode & 0xff))
-#define B11_0s (ctx->opcode & 0x800 ? 0xfffff000 | (ctx->opcode & 0xfff) :  (ctx->opcode & 0xfff))
-#define B11_8 ((ctx->opcode >> 8) & 0xf)
-#define B15_12 ((ctx->opcode >> 12) & 0xf)
-
-#define REG(x)     cpu_gregs[(x) ^ ctx->gbank]
-#define ALTREG(x)  cpu_gregs[(x) ^ ctx->gbank ^ 0x10]
-#define FREG(x)    cpu_fregs[(x) ^ ctx->fbank]
-
-#define XHACK(x) ((((x) & 1 ) << 4) | ((x) & 0xe))
-
-
-
-
 
 static void regop_decode_opc(DisasContext * ctx){
     TCGv t0, t_31;
-
-//    printf("regop %08x %08x \n",ctx->base.pc_next,ctx->opcode);
+//    TCGLabel *l1; //= gen_new_label();
+//    TCGLabel *ldone; //= gen_new_label();
 
     tcg_gen_addi_tl(cpu_R[R_PC], cpu_R[R_PC], 4);
 
@@ -278,6 +173,9 @@ static void regop_decode_opc(DisasContext * ctx){
       if (((ctx->opcode >> 28) & 1) == 1){
         tcg_gen_ori_tl(cval, cval, 0xFFFF0000 );
       }
+      break;
+    default:
+      tcg_gen_movi_tl(cval, 0);  // shouldn't happen
     }
 
     switch (OPCODE){
@@ -386,20 +284,62 @@ static void regop_decode_opc(DisasContext * ctx){
       }
       break;
     case DIV:
-      tcg_gen_divu_tl(cpu_R[REGA], cpu_R[REGB], cval);
+
+//        if ((int32_t)c_val > 0) {
+   
+      t0 = tcg_temp_local_new();
+      t_31 = tcg_temp_local_new();
+
+
+//      tcg_gen_movi_tl(t0, 0);
+//      tcg_gen_brcond_tl(TCG_COND_EQ, t0, cval, l1);
+
+
+//      tcg_gen_div_tl(cpu_R[REGA], cpu_R[REGB], cval);
+
+
+//          if ((ir & ubit) == 0) {
+//            a_val = (int32_t)b_val / (int32_t)c_val;
+
+      tcg_gen_div_tl(t0, cpu_R[REGB], cval);
+      tcg_gen_rem_tl(t_31, cpu_R[REGB], cval);
+
+//            risc->H = (int32_t)b_val % (int32_t)c_val;
+//            if ((int32_t)risc->H < 0) {
+//              a_val--;
+//              risc->H += c_val;
+//            }
+//          } else {
+//            a_val = b_val / c_val;
+//            risc->H = b_val % c_val;
+//          }
+
+      tcg_gen_mov_tl(cpu_R[REGA],t0);
+      tcg_gen_mov_tl(cpu_R[R_H],t_31);
+
+//        } else {
+
+      tcg_temp_free(t0);
+      tcg_temp_free(t_31);
+
+
+//          struct idiv q = idiv(b_val, c_val, ir & ubit);
+//          a_val = q.quot;
+//          risc->H = q.rem;
+//        }
 
       break;
     case FAD:
-
+      printf("FAD\n");
       break;
     case FSB:
-
+      printf("FSB\n");
       break;
     case FML:
-
+      printf("FML\n");
       break;
     case FDV:
-
+      printf("FDV\n");
       break;
 
     }
@@ -443,8 +383,6 @@ static void braop_decode_opc(DisasContext * ctx){
     TCGv dval = tcg_temp_new_i32();
     TCGLabel *l1 = gen_new_label();
 
-//    printf("braop %08x %08x ",ctx->base.pc_next,ctx->opcode);
-
     tcg_gen_movi_tl(cpu_sr_t, (ctx->opcode >> 27) & 1);
     switch ((ctx->opcode >> 24) & 7) {
       case BMI: tcg_gen_xor_tl(cpu_sr_t, cpu_sr_t, cpu_R[R_N]); break; // BPL
@@ -472,14 +410,14 @@ static void braop_decode_opc(DisasContext * ctx){
 
 
     if ( OPU  == 0) {                          /* dest in register c */
-//      printf(" register branch\n");
+
       tcg_gen_mov_tl(cpu_R[R_PC], cpu_R[REGC]);
             tcg_gen_exit_tb(NULL, 0);
-//            tcg_gen_lookup_and_goto_ptr();
+
     }else{                                      /* dest pc relative */
       tcg_gen_movi_tl(cpu_R[R_PC],ctx->base.pc_next + 4 + (IMM24s << 2 ));
       gen_goto_tb(ctx, 0, ctx->base.pc_next + 4 + (IMM24s << 2 ));
-//      printf(" relative branch to %08x \n",ctx->base.pc_next + 4 + (IMM24s << 2 ));
+
     }
 
     gen_set_label(l1);
@@ -516,18 +454,8 @@ static void risc6_tr_init_disas_context(DisasContextBase *dcbase, CPUState *cs)
     int bound;
 
     ctx->tbflags = tbflags = ctx->base.tb->flags;
-//    ctx->envflags = tbflags & TB_FLAG_ENVFLAGS_MASK;
+
     ctx->memidx = 0; //(tbflags & (1u << SR_MD)) == 0 ? 1 : 0;
-//    /* We don't know if the delayed pc came from a dynamic or static branch,
-//       so assume it is a dynamic branch.  */
-//    ctx->delayed_pc = -1; /* use delayed pc from env pointer */
-//    ctx->features = env->features;
-//    ctx->has_movcal = (tbflags & TB_FLAG_PENDING_MOVCA);
-//    ctx->gbank = ((tbflags & (1 << SR_MD)) &&
-//                  (tbflags & (1 << SR_RB))) * 0x10;
-//    ctx->fbank = tbflags & FPSCR_FR ? 0x10 : 0;
-
-
     /* Since the ISA is fixed-width, we can bound by the number
        of instructions remaining on the page.  */
     bound = -(ctx->base.pc_next | TARGET_PAGE_MASK) / 4;
