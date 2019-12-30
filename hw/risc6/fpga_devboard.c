@@ -56,7 +56,7 @@ static void risc6_fpga_risc_init(MachineState *machine)
 
 /*    MemoryRegion *phys_ram_alias = g_new(MemoryRegion, 1); */
     ram_addr_t rom_base  = 0xFFFFF800;
-    ram_addr_t rom_size  = 0x2000;    
+    ram_addr_t rom_size  = 0x800;    
     ram_addr_t ram_base  = 0x00000000;
     ram_addr_t ram_size  = 0x000e7f00;
     ram_addr_t vram_base = 0x000e7f00;
