@@ -2,20 +2,20 @@ qemu-risc6 README
 =================
 
 This is a clone of https://github.com/qemu/qemu
-Work on the risc6 backend is being done on the risc6 branch, so after
+Work on the Oberon RISC backend is being done on the risc6 branch, so after
 you clone this (git clone https://github.com/io-core/qemu-risc6) you will want to do the following within the repo directory:
 
 git checkout risc6
 
-Otherwise you might not see the RISC6 target.
+Otherwise you might not see the Oberon RISC target.
 
 <img src="https://github.com/io-core/qemu-risc6/blob/risc6/Oberon.png?raw=true">
 
-The target is named risc6 to avoid confusion with the already existing riscv target in qemu and because in one communication (<a href="https://inf.ethz.ch/personal/wirth/ProjectOberon/RISC5.Update.pdf">An Update of the RISC5 Implementation</a>) Professor Wirth defines module RISC6 to introduce interrupts into the architecture.
+The target is named risc6 here in an attempt to avoid confusion with the already existing riscv target in qemu and because in one communication (<a href="https://inf.ethz.ch/personal/wirth/ProjectOberon/RISC5.Update.pdf">An Update of the RISC5 Implementation</a>) Professor Wirth defines module RISC6 to introduce interrupts into the architecture. Everywhere else this architecture is called RISC5.
 
-This is very much a work in progress. A number of opcodes are not fully implememented (floating point in particular,) disk writes are a no-op, and interrupts are not wired up yet.
+This is very much a work in progress. A number of opcodes are not fully implememented (floating point in particular) and interrupts are not wired up yet.
 
-QEMU is a large project and there are lots of files in it. For RISC6 some key files are:
+QEMU is a large project and there are lots of files in it. For the Oberon RISC architectur some key files are:
 
 * disas/risc6.h
 * disas/risc6.c
