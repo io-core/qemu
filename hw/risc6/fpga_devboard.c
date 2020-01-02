@@ -48,6 +48,10 @@ static void risc6_fpga_risc_init(MachineState *machine)
 {
     RISC6CPU *cpu;
     DeviceState *dev;
+
+    ram_addr_t rram_size = machine->ram_size;
+    printf("Requested RAM: %ld\n",rram_size);
+
     MemoryRegion *address_space_mem = get_system_memory();
     MemoryRegion *phys_rom = g_new(MemoryRegion, 1);
 

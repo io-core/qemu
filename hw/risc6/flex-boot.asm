@@ -436,7 +436,7 @@ B4:
  ld   r0 r0 0
 
  mov' r0 5369H
- ior  r0 r0 7A66H
+ ior  r0 r0 7A67H
  mov' r1 eH
  ior  r1 r1 7f00H
  st   r0 r1 0
@@ -452,8 +452,17 @@ B4:
  ld   r0 r2 0
  div  r0 r0 100H
  and  r0 r0 fffH
- st   r0 r1 8
  st   r0 r3 0
+ st   r0 r1 8
+
+ ld   r0 r2 4
+ st   r0 r3 0
+ st   r0 r1 12
+
+ mov  r1 0H
+ st   r0 r1 12
+ div  r0 r0 2H
+ st   r0 r1 24
 
  mov  r0 0H
   br  r0

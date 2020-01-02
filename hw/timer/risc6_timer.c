@@ -122,6 +122,7 @@ typedef struct RISC6Timer {
     MemoryRegion  mmio;
     MemoryRegion  vram_mem;
     uint32_t      vram_size;
+    uint32_t      ram_size;
     uint32_t      freq_hz;
     uint32_t      milliseconds;
     int           full_update;
@@ -993,6 +994,7 @@ static void risc6_timer_reset(DeviceState *dev)
 static Property risc6_timer_properties[] = {
     DEFINE_PROP_UINT32("clock-frequency", RISC6Timer, freq_hz, 1000),
     DEFINE_PROP_UINT32("vram-size",       RISC6Timer, vram_size, -1),
+    DEFINE_PROP_UINT32("ram-size",        RISC6Timer, ram_size,  -1),
     DEFINE_PROP_UINT16("width",           RISC6Timer, width,     -1),
     DEFINE_PROP_UINT16("height",          RISC6Timer, height,    -1),
     DEFINE_PROP_UINT16("depth",           RISC6Timer, depth,     -1),
