@@ -49,31 +49,32 @@ static void risc6_fpga_risc_init(MachineState *machine)
     RISC6CPU *cpu;
     DeviceState *dev;
 
-    ram_addr_t rram_size = machine->ram_size;
-    printf("Requested RAM: %ld\n",rram_size);
 
-    MemoryRegion *address_space_mem = get_system_memory();
-    MemoryRegion *phys_rom = g_new(MemoryRegion, 1);
-
-/*    MemoryRegion *phys_tcm_alias = g_new(MemoryRegion, 1); */
-    MemoryRegion *phys_ram = g_new(MemoryRegion, 1);
-
-/*    MemoryRegion *phys_ram_alias = g_new(MemoryRegion, 1); */
     ram_addr_t rom_base  = 0xFFFFF800;
-    ram_addr_t rom_size  = 0x800;    
+    ram_addr_t rom_size  = 0x800;
     ram_addr_t ram_base  = 0x00000000;
     ram_addr_t ram_size  = 0x000e7f00;
     ram_addr_t vram_base = 0x000e7f00;
     ram_addr_t vram_size = 0x00100000;
 
+    ram_addr_t rram_size = machine->ram_size;
+    printf("Requested RAM: %ld M\n",rram_size/(1024*1024));
+
+    if(rram_size > (1024*1024)){
+      ram_size  = rram_size;
+      vram_base = rram_size;
+    }
+
+    MemoryRegion *address_space_mem = get_system_memory();
+    MemoryRegion *phys_rom = g_new(MemoryRegion, 1);
+    MemoryRegion *phys_ram = g_new(MemoryRegion, 1);
+
     qemu_irq *cpu_irq, irq[32];
     int i;
-
 
     /* Physical ROM */
     memory_region_init_ram(phys_rom, NULL, "risc6.rom", rom_size, &error_abort);
     memory_region_add_subregion(address_space_mem, rom_base, phys_rom);
-
 
     /* Physical DRAM */
     memory_region_init_ram(phys_ram, NULL, "risc6.ram", ram_size, &error_abort);
@@ -141,6 +142,7 @@ static void risc6_fpga_risc_init(MachineState *machine)
     dev = qdev_create(NULL, "RISC6,io");
     qdev_prop_set_uint32(dev, "clock-frequency", 750 * 1000000);
     qdev_prop_set_uint32(dev, "vram-size", vram_size);
+    qdev_prop_set_uint32(dev, "ram-size", ram_size);
     qdev_prop_set_uint16(dev, "width", graphic_width);
     qdev_prop_set_uint16(dev, "height", graphic_height);
     qdev_prop_set_uint16(dev, "depth", graphic_depth);

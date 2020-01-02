@@ -487,6 +487,10 @@ static uint64_t timer_read(void *opaque, hwaddr addr,
 //        printf("DEBUG READ: %04x %04x %08lx\n",t->width,t->height,r);
 
         break;
+    case R_DEBUG2:
+        r=(uint64_t)t->ram_size;
+        printf("Read of RAM size register: %08lx\n",r);
+        break;
     case R_CONTROL:
         r = t->regs[R_CONTROL] & (CONTROL_ITO | CONTROL_CONT);
         break;

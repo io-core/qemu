@@ -1,0 +1,1 @@
+./risc6-softmmu/qemu-system-risc6 -machine fpga-risc -display gtk -g 1400x968x8 -monitor stdio -device loader,file=hw/risc6/flex-boot.asm.bin,addr=0xfffff800 -drive format=raw,file=IO.img -smp 1 -m 1M
